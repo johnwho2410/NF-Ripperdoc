@@ -11,6 +11,27 @@ if (args.Length > 0 && args[0] == "perf")
     return;
 }
 
+// KI-Prompt: gamedoctor prompt [--days 30] [--out prompt.txt]
+if (args.Length > 0 && args[0] == "prompt")
+{
+    int pDays = 30;
+    string? pOut = null;
+    for (int i = 1; i < args.Length; i++)
+    {
+        if (args[i] == "--days") pDays = int.Parse(args[++i]);
+        else if (args[i] == "--out") pOut = args[++i];
+    }
+    var res = CrashAnalyzer.Run(new CrashAnalyzerOptions { Days = pDays });
+    GameDoctor.Core.Performance.PerformanceReport? perfReport = null;
+    if (GameDoctor.Core.Performance.RecordingStore.Latest() is { } rf)
+        perfReport = GameDoctor.Core.Performance.PerformanceAnalyzer.Analyze(
+            GameDoctor.Core.Performance.RecordingStore.Load(rf), GameDoctor.Core.Games.Cyberpunk.CyberpunkSettings.TryLoad());
+    var prompt = AiPromptBuilder.Build(res, new AiPromptOptions { Performance = perfReport });
+    if (pOut is not null) { File.WriteAllText(pOut, prompt, Encoding.UTF8); Console.WriteLine($"Gespeichert: {pOut} ({prompt.Length:N0} Zeichen)"); }
+    else Console.WriteLine(prompt);
+    return;
+}
+
 string? gamePath = null;
 string? outFile = null;
 int days = 30;

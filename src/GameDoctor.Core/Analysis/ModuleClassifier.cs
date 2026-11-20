@@ -179,7 +179,9 @@ public sealed class ModuleClassifier
         {
             int idx = p.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
             if (idx < 0) continue;
-            var folder = p[(idx + marker.Length)..].Split('\\')[0];
+            // Unsichtbare Steuerzeichen entfernen (Vortex/Mod-Autoren nutzen z. B. U+061C für die Ladereihenfolge)
+            var folder = new string(p[(idx + marker.Length)..].Split('\\')[0]
+                .Where(ch => char.GetUnicodeCategory(ch) != System.Globalization.UnicodeCategory.Format).ToArray());
             return folder.Equals(module.Name, StringComparison.OrdinalIgnoreCase) ? folder : $"{folder} ({module.Name})";
         }
         var name = module.Name.ToLowerInvariant();

@@ -200,13 +200,30 @@ public partial class MainWindow : Window
             Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true });
     }
 
-    // Dunkle Titelleiste (Windows 10 20H1+ / Windows 11)
+    // ------------------------------------------------------------------ KI-Prompt
+
+    private void Prompt_Click(object sender, RoutedEventArgs e) => OpenPrompt(null);
+
+    private void CrashPrompt_Click(object sender, RoutedEventArgs e) => OpenPrompt(_vm.SelectedCrash?.Case);
+
+    private void OpenPrompt(CrashCase? focus)
+    {
+        if (_vm.Result is null) return;
+        new PromptWindow(_vm.Result, focus, _vm.Perf.LastReport) { Owner = this }.Show();
+    }
+
+    private void UseDarkTitleBar() => DarkTitleBar.Apply(this);
+}
+
+/// <summary>Dunkle Titelleiste (Windows 10 20H1+ / Windows 11).</summary>
+public static class DarkTitleBar
+{
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
-    private void UseDarkTitleBar()
+    public static void Apply(Window window)
     {
-        var hwnd = new WindowInteropHelper(this).Handle;
+        var hwnd = new WindowInteropHelper(window).Handle;
         int on = 1;
         DwmSetWindowAttribute(hwnd, 20, ref on, sizeof(int));
     }

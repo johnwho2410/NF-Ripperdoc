@@ -21,6 +21,10 @@ Absturz- und Performance-Analyse für Cyberpunk 2077 (später weitere Spiele).
 - Empfehlungen auf Basis der echten Spieleinstellungen (`UserSettings.json`)
 - Kommandozeile: `gamedoctor perf [--seconds 60]`
 
+**KI-Prompt-Generator:** fasst alle Befunde (System, Abstürze, Muster, Mod-Logs, Mod-Liste, Performance) als
+anonymisierten Text für ChatGPT, Claude, Gemini o. ä. zusammen. App: „KI-Prompt“ bzw. „KI-Prompt für diesen Absturz“,
+Kommandozeile: `gamedoctor prompt [--out prompt.txt]`.
+
 ## Benutzung
 
 Oberfläche (Übersicht, Absturzliste mit Details, Mods & System):

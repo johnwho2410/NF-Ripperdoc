@@ -113,8 +113,11 @@ public sealed class PerformanceViewModel : ObservableObject
             : "Warte auf Cyberpunk 2077 … Starte das Spiel, die Aufnahme beginnt automatisch.";
     }
 
+    public GameDoctor.Core.Performance.PerformanceReport? LastReport { get; private set; }
+
     public void ShowReport(GameDoctor.Core.Performance.PerformanceReport r)
     {
+        LastReport = r;
         ResultTiles.Clear();
         ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.AvgFps.ToString("F0") : "–", "Ø FPS"));
         ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.OnePercentLowFps.ToString("F0") : "–", "1 % Low"));
