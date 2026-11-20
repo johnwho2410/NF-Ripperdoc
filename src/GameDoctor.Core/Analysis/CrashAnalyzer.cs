@@ -312,6 +312,27 @@ public static class CrashAnalyzer
                 g.Select(c => c.Report.Time.ToString("dd.MM.yyyy HH:mm")).ToList()));
         }
 
+        // Absturzstelle fest an eine Mod gekoppelt: dieselbe Signatur, und fast jedes Mal dieselbe Mod auf dem Stack
+        foreach (var g in crashes.Where(c => c.Signature != "?" && c.FaultKind is ModuleKind.GameExecutable or ModuleKind.GameRuntime or ModuleKind.System)
+                     .GroupBy(c => c.Signature).Where(g => g.Count() >= 3))
+        {
+            var coupled = g.SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay).Select(s => s.Name).Distinct())
+                .GroupBy(n => n).Select(x => (Name: x.Key, Count: x.Count()))
+                .Where(x => x.Count >= 3 && x.Count >= 0.8 * g.Count())
+                .OrderByDescending(x => x.Count).FirstOrDefault();
+            if (coupled.Name is null) continue;
+            result.PatternFindings.Insert(0, new Finding(Severity.Critical,
+                $"Absturzstelle {g.Key} ist an „{coupled.Name}“ gekoppelt",
+                $"Diese Absturzstelle trat {g.Count()}× auf – und {coupled.Count}× davon lag „{coupled.Name}“ im Aufrufpfad. " +
+                "Eine so feste Kopplung ist kein Zufall: Die Mod ruft diesen Teil der Engine auf und übergibt dabei offenbar ungültige Daten.",
+                $"„{coupled.Name}“ testweise deaktivieren. Bleiben diese Abstürze danach aus, ist die Ursache bestätigt – dann nach einem Update suchen oder die Mod weglassen.",
+                g.Select(c => c.Report.Time.ToString("dd.MM.yyyy HH:mm")).ToList())
+            { Category = "Ursache" });
+        }
+
+        // Abstürze häufen sich an einem Ort
+        ApplyLocationRules(result);
+
         // Nach Kategorie
         var byKind = crashes.Where(c => c.Dump?.Error is null && c.Dump is not null).GroupBy(c => c.FaultKind)
             .Select(g => $"{ModuleClassifier.KindLabel(g.Key)}: {g.Count()}×").ToList();
@@ -336,6 +357,60 @@ public static class CrashAnalyzer
             result.PatternFindings.Add(new Finding(Severity.Info, "Spielversion hat sich im Zeitraum geändert",
                 "Die Abstürze stammen aus verschiedenen Spielversionen – nach einem Update brauchen viele Mods selbst ein Update.",
                 null, versions!));
+    }
+
+    // Bekannte Orte (Weltkoordinaten x/y, Radius in Metern) – bewusst nur sicher zugeordnete Einträge
+    private static readonly (string Name, double X, double Y, double Radius)[] KnownPlaces =
+    [
+        ("Megagebäude H10 (Vs Wohnung, Watson)", -1370, 1270, 120),
+    ];
+
+    private const double ClusterRadius = 150;
+
+    private static void ApplyLocationRules(AnalysisResult result)
+    {
+        var located = result.Crashes.Where(c => c.Report.Position is not null).ToList();
+        if (located.Count < 3) return;
+
+        static double Dist((double X, double Y, double Z) a, (double X, double Y, double Z) b) =>
+            Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2));
+
+        var clusters = new List<List<CrashCase>>();
+        foreach (var c in located.OrderBy(c => c.Report.Time))
+        {
+            var pos = c.Report.Position!.Value;
+            var cluster = clusters.FirstOrDefault(k => k.Any(o => Dist(o.Report.Position!.Value, pos) < ClusterRadius));
+            if (cluster is null) clusters.Add([c]); else cluster.Add(c);
+        }
+
+        foreach (var cl in clusters.Where(k => k.Count >= 3).OrderByDescending(k => k.Count).Take(4))
+        {
+            double cx = cl.Average(c => c.Report.Position!.Value.X), cy = cl.Average(c => c.Report.Position!.Value.Y);
+            var place = KnownPlaces.FirstOrDefault(p => Math.Sqrt(Math.Pow(p.X - cx, 2) + Math.Pow(p.Y - cy, 2)) < p.Radius + ClusterRadius / 2).Name;
+            var where = place ?? $"bei Koordinaten [{cx:F0}, {cy:F0}]";
+
+            int sameSpot = cl.Count(c => cl.Count(o => Dist(o.Report.Position!.Value, c.Report.Position!.Value) < 10) >= 2);
+            int shortUptime = cl.Count(c => c.Report.UptimeSeconds is < 300);
+            var signatures = cl.GroupBy(c => c.Signature).OrderByDescending(g => g.Count()).ToList();
+
+            var detail = $"{cl.Count} von {located.Count} Abstürzen mit bekannter Position passierten {where} (Umkreis {ClusterRadius:F0} m). ";
+            string rec;
+            if (sameSpot >= 3 && shortUptime >= cl.Count / 2)
+            {
+                detail += $"Mehrere davon an exakt derselben Stelle und kurz nach dem Laden – typisch für einen Spielstand, der genau dort steht und beim Laden immer wieder abstürzt.";
+                rec = "Einen älteren Spielstand an einem anderen Ort laden. Hilft das, liegt es an Objekten/Mods, die an diesem Ort geladen werden.";
+            }
+            else
+            {
+                detail += "Ein Ort, an dem es immer wieder kracht, deutet auf Mods hin, die dort Inhalte hinzufügen (Garagen, Wohnungs-Deko, Fahrzeuge, NPCs) – oder auf eine dort geladene Szene, die mit Mods kollidiert.";
+                rec = "Prüfen, welche Mods diesen Ort verändern (z. B. Garagen-, Wohnungs- oder Fahrzeug-Mods) und diese testweise deaktivieren. Hinweise auf defekte Mod-Inhalte stehen unter „Mods & System“.";
+            }
+            result.PatternFindings.Add(new Finding(cl.Count >= 4 ? Severity.Warning : Severity.Hint,
+                $"Abstürze häufen sich an einem Ort: {where} ({cl.Count}×)",
+                detail, rec,
+                cl.Select(c => $"{c.Report.Time:dd.MM. HH:mm}  Höhe {c.Report.Position!.Value.Z,4:F0} m  {c.Signature}  nach {TimeSpan.FromSeconds(c.Report.UptimeSeconds ?? 0):h\\:mm\\:ss}").ToList())
+            { Category = "Ort" });
+        }
     }
 
     // ------------------------------------------------------------------
@@ -370,6 +445,21 @@ public static class CrashAnalyzer
                     "Mehrere Mods ersetzen dieselbe Spielfunktion – nur eine davon wirkt. Das führt zu Fehlverhalten und kann Abstürze begünstigen.",
                     "Bei Konflikten prüfen, ob die Mods als kompatibel gelten; ggf. eine davon entfernen.",
                     conflicts.GroupBy(c => c.Mod ?? "?").Select(g => $"{g.Key}: {g.Sum(x => x.Count)} Konflikt(e)").ToList()) { Category = "Mods" });
+
+            // Mod-Inhalte, die das Spiel nicht findet (z. B. Garagen ohne geladene Welt-Sektoren)
+            foreach (var u in logs.UnresolvedContent.Where(u => u.Items.Count >= 2).OrderByDescending(u => u.Items.Count))
+            {
+                var modHint = FindModFiles(install, u.Owner);
+                result.EnvironmentFindings.Add(new Finding(Severity.Warning,
+                    $"Mod-Inhalte werden nicht gefunden: „{u.Owner}“ ({u.Items.Count} Einträge)",
+                    $"{u.Source} meldet, dass {u.Items.Count} Verweise dieser Mod (Orte, Kartenmarkierungen, Journal-Einträge) ins Leere zeigen. " +
+                    "Die Mod ist also nur teilweise geladen – meist wegen einer veralteten Version, einer fehlenden Abhängigkeit oder einer unvollständigen Installation. " +
+                    "An den Orten, die diese Mod verändert, steigt das Absturzrisiko." +
+                    (modHint.Count > 0 ? $" Zugehörige Dateien: {string.Join(", ", modHint.Take(4))}{(modHint.Count > 4 ? " …" : "")}." : ""),
+                    "Mod neu installieren bzw. aktualisieren und Abhängigkeiten auf der Mod-Seite prüfen. Bis dahin testweise deaktivieren – besonders, wenn Abstürze an diesen Orten auftreten.",
+                    u.Items.Take(12).ToList())
+                { Category = "Mods" });
+            }
 
             var warnings = logs.Issues.Where(i => i.Severity == Severity.Warning).OrderByDescending(i => i.Count).ToList();
             if (warnings.Count > 0)
@@ -407,6 +497,25 @@ public static class CrashAnalyzer
                 "Der PC ging ohne sauberes Herunterfahren aus. Beim Spielen oft Netzteil, Temperatur oder Übertaktung.", null,
                 result.SystemEvents.Where(e => e.Kind == SystemEventKind.UnexpectedShutdown).Take(5).Select(e => e.Time.ToString("dd.MM.yyyy HH:mm")).ToList())
             { Category = "Hardware" });
+    }
+
+    /// <summary>Sucht Mod-Dateien/-Ordner, deren Name zum Kürzel passt (z. B. „icm_garages“ → ICM_Garage_*.archive).</summary>
+    private static List<string> FindModFiles(CyberpunkInstall? install, string owner)
+    {
+        if (install is null) return [];
+        // Kürzel auf den Kern reduzieren: "icm_garages" → "icm_garage"
+        var token = owner.ToLowerInvariant().TrimEnd('s');
+        var found = new List<string>();
+        foreach (var dir in new[] { install.ArchiveModDir, install.RedscriptDir, Path.Combine(install.CetDir, "mods"), Path.Combine(install.Root, "r6", "tweaks") })
+        {
+            if (!Directory.Exists(dir)) continue;
+            foreach (var e in Directory.EnumerateFileSystemEntries(dir))
+            {
+                var name = Path.GetFileName(e);
+                if (name.ToLowerInvariant().Replace(" ", "_").Contains(token)) found.Add(name);
+            }
+        }
+        return found;
     }
 
     private static string Describe(LogIssue i) =>

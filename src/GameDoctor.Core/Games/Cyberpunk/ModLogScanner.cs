@@ -4,12 +4,16 @@ namespace GameDoctor.Core.Games.Cyberpunk;
 
 public sealed record LogIssue(string Source, Severity Severity, string Message, int Count, string? Mod, string File);
 
+/// <summary>Inhalte einer Mod (Orte, Kartenmarkierungen, Journal-Einträge), die das Spiel nicht findet.</summary>
+public sealed record UnresolvedModContent(string Source, string Owner, IReadOnlyList<string> Items, string File);
+
 /// <summary>Liest die Logs der gängigen Mod-Frameworks (redscript, RED4ext, CET, ArchiveXL, TweakXL) aus.</summary>
 public sealed class ModLogScanner(CyberpunkInstall install)
 {
     public sealed class Result
     {
         public List<LogIssue> Issues { get; } = [];
+        public List<UnresolvedModContent> UnresolvedContent { get; } = [];
         public List<string> ScannedFiles { get; } = [];
         public string? Red4ExtVersion { get; set; }
         public string? Red4ExtGameVersion { get; set; }
@@ -195,6 +199,9 @@ public sealed class ModLogScanner(CyberpunkInstall install)
 
     // ---------- ArchiveXL / TweakXL / Codeware ----------
     // [2026-11-20 17:01:18.488] [17592] [warning] [QuestPhase] message  – Reihenfolge der Klammern variiert je Tool
+    // [Journal] Can't resolve mappin #2466948601 (points_of_interest/icm_garages/icm_garage_littlechinagarage) reference.
+    private static readonly Regex UnresolvedRef = new(@"Can't resolve \w+ #\d+ \((?<path>[^)]+)\)", RegexOptions.Compiled);
+
     private static readonly Regex LeadingBracket = new(@"^\s*\[(?<c>[^\]]*)\]", RegexOptions.Compiled);
     private static readonly HashSet<string> LevelWords = ["trace", "debug", "info", "warning", "warn", "error", "critical", "fatal"];
 
@@ -220,9 +227,20 @@ public sealed class ModLogScanner(CyberpunkInstall install)
         // Gleichartige Meldungen (unterscheiden sich nur in Namen in "…") zusammenfassen; erstes Beispiel behalten
         var grouped = new Dictionary<(Severity, string), int>();
         var examples = new Dictionary<(Severity, string), string>();
+        // Nicht auflösbare Verweise je Mod-Ordner sammeln (z. B. points_of_interest/icm_garages/...)
+        var unresolved = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var line in SafeReadLines(file))
         {
             if (SplitLevel(line) is not var (lvl, msg)) continue;
+            var um = UnresolvedRef.Match(msg);
+            if (um.Success && lvl is "error" or "warning" or "warn")
+            {
+                var segs = um.Groups["path"].Value.Split('/', '\\');
+                var owner = segs.Length >= 3 ? segs[1] : segs[0];
+                if (!unresolved.TryGetValue(owner, out var list)) unresolved[owner] = list = [];
+                list.Add(segs[^1]);
+                continue;
+            }
             Severity? sev = lvl switch
             {
                 "error" or "critical" or "fatal" => Severity.Warning,
@@ -239,6 +257,11 @@ public sealed class ModLogScanner(CyberpunkInstall install)
         {
             var text = count > 1 ? $"{key.Item2}  – z. B.: {examples[key]}" : examples[key];
             r.Issues.Add(new LogIssue(source, key.Item1, Truncate(text, 260), count, null, file));
+        }
+        foreach (var (owner, items) in unresolved)
+        {
+            var distinct = items.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            r.UnresolvedContent.Add(new UnresolvedModContent(source, owner, distinct, file));
         }
     }
 

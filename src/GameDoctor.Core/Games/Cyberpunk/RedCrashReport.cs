@@ -32,6 +32,24 @@ public sealed class RedCrashReport
     public string? GpuDriver => Engine.GetValueOrDefault("Gpu/Device/DriverVersion");
     public bool? RayTracing => Engine.TryGetValue("Gpu/RayTracing/Enabled", out var r) ? r == "true" : null;
 
+    /// <summary>Kameraposition im Spiel zum Absturzzeitpunkt (x, y, z in Metern); null, wenn unbekannt oder ungültig.</summary>
+    public (double X, double Y, double Z)? Position
+    {
+        get
+        {
+            if (Engine.GetValueOrDefault("Streaming/IsLastObserverPositionValid") == "false") return null;
+            var raw = Engine.GetValueOrDefault("Streaming/LastObserverPosition");
+            if (raw is null) return null;
+            var parts = raw.Trim('[', ']', ' ').Split(',');
+            if (parts.Length < 3) return null;
+            var nums = parts.Select(p => double.TryParse(p.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : double.NaN).ToArray();
+            if (nums.Any(double.IsNaN)) return null;
+            // [0, 3, 1] o. ä. = Hauptmenü/noch keine Welt geladen
+            if (Math.Abs(nums[0]) < 10 && Math.Abs(nums[1]) < 10) return null;
+            return (nums[0], nums[1], nums[2]);
+        }
+    }
+
     public static string DefaultQueueDir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "REDEngine", "ReportQueue");
 
