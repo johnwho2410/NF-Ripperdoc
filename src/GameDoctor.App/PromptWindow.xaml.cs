@@ -115,7 +115,7 @@ public partial class PromptWindow : Window
         bool gotText = false;
         try
         {
-            using var client = new AiClient(settings);
+            using var client = AiClient.Create(settings);
             await foreach (var part in client.StreamChatAsync([AiMessage.User(prompt)], _cts.Token))
             {
                 if (!gotText) { gotText = true; InfoText.Text = $"{settings.Provider.Name} ({settings.EffectiveModel}) antwortet …"; }

@@ -60,6 +60,8 @@ public partial class AiSettingsWindow : Window
     {
         ProviderHint.Text = Provider.Hint;
         KeyPanel.Visibility = Provider.NeedsKey ? Visibility.Visible : Visibility.Collapsed;
+        // Beim Anthropic-SDK ist die Adresse fest eingebaut.
+        BaseUrlPanel.Visibility = Provider.Api == AiApi.Anthropic ? Visibility.Collapsed : Visibility.Visible;
         bool sameProvider = _providerId == _settings.Provider.Id;
         KeyState.Text = sameProvider && _settings.HasApiKey
             ? "Ein Key ist gespeichert (verschlüsselt, nur für deinen Windows-Benutzer lesbar). Feld leer lassen, um ihn zu behalten."
@@ -89,7 +91,7 @@ public partial class AiSettingsWindow : Window
         SetStatus("Lade Modellliste …", false);
         try
         {
-            using var client = new AiClient(s);
+            using var client = AiClient.Create(s);
             var models = await client.ListModelsAsync();
             ModelList.ItemsSource = models;
             ModelList.Visibility = models.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -122,7 +124,7 @@ public partial class AiSettingsWindow : Window
         SetStatus($"Teste {s.Provider.Name} mit „{s.EffectiveModel}“ …", false);
         try
         {
-            using var client = new AiClient(s);
+            using var client = AiClient.Create(s);
             var answer = "";
             await foreach (var part in client.StreamChatAsync([AiMessage.User("Antworte nur mit dem Wort: OK")]))
                 answer += part;

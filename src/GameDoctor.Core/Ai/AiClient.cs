@@ -19,18 +19,43 @@ public sealed record AiMessage(string Role, string Content)
 public sealed class AiException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>
+/// Gemeinsame Schnittstelle aller KI-Anbieter. <see cref="Create"/> wählt die passende Umsetzung.
+/// </summary>
+public abstract class AiClient : IDisposable
+{
+    protected readonly AiSettings _settings;
+
+    protected AiClient(AiSettings settings) => _settings = settings;
+
+    public static AiClient Create(AiSettings settings) => settings.Provider.Api switch
+    {
+        AiApi.Anthropic => new AnthropicAiClient(settings),
+        _ => new OpenAiCompatibleClient(settings),
+    };
+
+    public string ProviderName => _settings.Provider.Name;
+    public string Model => _settings.EffectiveModel;
+
+    /// <summary>Listet die Modelle, die der Dienst anbietet (für die Auswahl in den Einstellungen).</summary>
+    public abstract Task<List<string>> ListModelsAsync(CancellationToken ct = default);
+
+    /// <summary>Schickt die Unterhaltung und liefert die Antwort Stück für Stück.</summary>
+    public abstract IAsyncEnumerable<string> StreamChatAsync(IReadOnlyList<AiMessage> messages, CancellationToken ct = default);
+
+    public virtual void Dispose() { }
+}
+
+/// <summary>
 /// Client für jede OpenAI-kompatible Chat-Schnittstelle (OpenRouter, Ollama, LM Studio, OpenAI, Gemini, Groq …).
 /// Die Antwort wird gestreamt, damit man sie schon beim Entstehen lesen kann.
 /// </summary>
-public sealed class AiClient : IDisposable
+public sealed class OpenAiCompatibleClient : AiClient
 {
     private readonly HttpClient _http;
-    private readonly AiSettings _settings;
     private readonly string _baseUrl;
 
-    public AiClient(AiSettings settings)
+    public OpenAiCompatibleClient(AiSettings settings) : base(settings)
     {
-        _settings = settings;
         _baseUrl = settings.EffectiveBaseUrl.TrimEnd('/');
         // Kein Gesamt-Timeout: lange Antworten lokaler Modelle dürfen dauern. Abbrechen geht über das CancellationToken.
         _http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
@@ -44,11 +69,8 @@ public sealed class AiClient : IDisposable
         }
     }
 
-    public string ProviderName => _settings.Provider.Name;
-    public string Model => _settings.EffectiveModel;
-
     /// <summary>Listet die Modelle, die der Dienst anbietet (für die Auswahl in den Einstellungen).</summary>
-    public async Task<List<string>> ListModelsAsync(CancellationToken ct = default)
+    public override async Task<List<string>> ListModelsAsync(CancellationToken ct = default)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(20));
@@ -71,7 +93,7 @@ public sealed class AiClient : IDisposable
     }
 
     /// <summary>Schickt die Unterhaltung und liefert die Antwort Stück für Stück.</summary>
-    public async IAsyncEnumerable<string> StreamChatAsync(
+    public override async IAsyncEnumerable<string> StreamChatAsync(
         IReadOnlyList<AiMessage> messages,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
@@ -186,5 +208,5 @@ public sealed class AiClient : IDisposable
     private static string ErrorText(JsonNode err) =>
         err is JsonValue v ? v.ToString() : err["message"]?.ToString() ?? err.ToJsonString();
 
-    public void Dispose() => _http.Dispose();
+    public override void Dispose() => _http.Dispose();
 }

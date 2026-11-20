@@ -5,7 +5,16 @@ using System.Text.Json.Serialization;
 
 namespace GameDoctor.Core.Ai;
 
-/// <summary>Ein vorkonfigurierter KI-Anbieter. Alle sprechen das OpenAI-kompatible Chat-Format.</summary>
+/// <summary>Welche Schnittstelle ein Anbieter spricht.</summary>
+public enum AiApi
+{
+    /// <summary>OpenAI-kompatibles Chat-Format (…/chat/completions).</summary>
+    OpenAiCompatible,
+    /// <summary>Anthropics eigene Messages-API (über das offizielle SDK).</summary>
+    Anthropic,
+}
+
+/// <summary>Ein vorkonfigurierter KI-Anbieter.</summary>
 public sealed record AiProviderPreset(
     string Id,
     string Name,
@@ -13,7 +22,8 @@ public sealed record AiProviderPreset(
     string DefaultModel,
     bool NeedsKey,
     bool IsLocal,
-    string Hint);
+    string Hint,
+    AiApi Api = AiApi.OpenAiCompatible);
 
 public static class AiProviders
 {
@@ -21,6 +31,9 @@ public static class AiProviders
     [
         new("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", "google/gemini-2.5-flash", NeedsKey: true, IsLocal: false,
             "Ein Konto für viele Modelle (Gemini, Claude, GPT …). Key unter openrouter.ai/keys erstellen. Eine Auswertung kostet meist nur Cent-Beträge."),
+        new("anthropic", "Claude (Anthropic)", "https://api.anthropic.com", "claude-opus-5-5", NeedsKey: true, IsLocal: false,
+            "Direkt bei Anthropic. Key unter platform.claude.com → Settings → API Keys erstellen (beginnt mit sk-ant-). Das API-Guthaben ist getrennt von einem Claude-Abo und wird dort unter „Billing“ aufgeladen.",
+            AiApi.Anthropic),
         new("ollama", "Ollama (lokal)", "http://localhost:11434/v1", "", NeedsKey: false, IsLocal: true,
             "Läuft komplett auf deinem PC, kein Konto nötig. Ollama muss gestartet sein und ein Modell geladen haben (z. B. „ollama pull qwen3“)."),
         new("lmstudio", "LM Studio (lokal)", "http://localhost:1234/v1", "", NeedsKey: false, IsLocal: true,
