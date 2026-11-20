@@ -6,6 +6,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using GameDoctor.Core.Analysis;
+using GameDoctor.Core.Games.Cyberpunk;
+using GameDoctor.Core.Performance;
 using GameDoctor.Core.Report;
 using Microsoft.Win32;
 
@@ -21,6 +23,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = _vm;
         SourceInitialized += (_, _) => UseDarkTitleBar();
+        InitPerformance();
         Loaded += async (_, _) =>
         {
             _loaded = true;
@@ -69,7 +72,67 @@ public partial class MainWindow : Window
         if (OverviewPage is null) return; // während InitializeComponent
         OverviewPage.Visibility = Tabs.SelectedIndex == 0 ? Visibility.Visible : Visibility.Collapsed;
         CrashPage.Visibility = Tabs.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
-        EnvPage.Visibility = Tabs.SelectedIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
+        PerfPage.Visibility = Tabs.SelectedIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
+        EnvPage.Visibility = Tabs.SelectedIndex == 3 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // ------------------------------------------------------------------ Performance
+
+    private PerformanceRecorder? _recorder;
+
+    private void InitPerformance()
+    {
+        _vm.Perf.PresentMonAvailable = PresentMonTool.Find() is not null;
+        _vm.Perf.Hint = "Starte die Aufnahme, wechsle ins Spiel und spiele 2–5 Minuten. Danach hier auf „Aufnahme beenden“.";
+        Closing += (_, _) => _recorder?.Stop();
+    }
+
+    private void Record_Click(object sender, RoutedEventArgs e)
+    {
+        var perf = _vm.Perf;
+        if (_recorder is null)
+        {
+            // Entwickler-Schalter: anderes Programm messen (z. B. zum Testen ohne Spiel)
+            var process = Environment.GetEnvironmentVariable("GAMEDOCTOR_PERF_PROCESS") ?? "Cyberpunk2077.exe";
+            _recorder = new PerformanceRecorder(process);
+            _recorder.LiveUpdated += s => Dispatcher.BeginInvoke(() => perf.ShowLive(s));
+            _recorder.Start();
+            perf.IsRecording = true;
+            perf.Hint = "Aufnahme läuft …";
+            _vm.Status = "Performance-Aufnahme gestartet";
+            return;
+        }
+
+        var recording = _recorder.Stop();
+        _recorder.Dispose();
+        _recorder = null;
+        perf.IsRecording = false;
+        var report = PerformanceAnalyzer.Analyze(recording, CyberpunkSettings.TryLoad());
+        perf.ShowReport(report);
+        perf.Hint = $"Aufnahme beendet: {recording.Duration:mm\\:ss} min, {report.FrameCount:N0} Frames.";
+        _vm.Status = perf.Hint;
+    }
+
+    private async void DownloadPresentMon_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(this,
+            "PresentMon (Intel, Open Source, MIT-Lizenz, ca. 1 MB) wird vom offiziellen GitHub-Release heruntergeladen:\n\n" +
+            PresentMonTool.DownloadUrl + "\n\nDie Datei wird per Prüfsumme kontrolliert und unter\n" + PresentMonTool.ToolsDir + "\nabgelegt. Fortfahren?",
+            "PresentMon herunterladen", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+
+        try
+        {
+            _vm.Status = "Lade PresentMon herunter …";
+            await PresentMonTool.DownloadAsync();
+            _vm.Perf.PresentMonAvailable = true;
+            _vm.Status = "PresentMon installiert.";
+        }
+        catch (Exception ex)
+        {
+            _vm.Status = "Download fehlgeschlagen: " + ex.Message;
+            MessageBox.Show(this, ex.Message, "Download fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void SaveReport_Click(object sender, RoutedEventArgs e)

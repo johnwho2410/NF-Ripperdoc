@@ -5,6 +5,12 @@ using GameDoctor.Core.Report;
 
 Console.OutputEncoding = Encoding.UTF8;
 
+if (args.Length > 0 && args[0] == "perf")
+{
+    await RunPerf(args.Skip(1).ToArray());
+    return;
+}
+
 string? gamePath = null;
 string? outFile = null;
 int days = 30;
@@ -73,6 +79,44 @@ Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outFile))!);
 File.WriteAllText(outFile, MarkdownReport.Build(result, details), Encoding.UTF8);
 Console.WriteLine();
 Console.WriteLine($"Ausführlicher Bericht: {Path.GetFullPath(outFile)}");
+
+// Performance-Aufnahme: gamedoctor perf [--seconds 60]
+static async Task RunPerf(string[] args)
+{
+    int seconds = 0;
+    string process = "Cyberpunk2077.exe";
+    for (int i = 0; i < args.Length; i++)
+    {
+        if (args[i] == "--seconds") seconds = int.Parse(args[++i]);
+        else if (args[i] == "--process") process = args[++i];
+    }
+
+    if (GameDoctor.Core.Performance.PresentMonTool.Find() is null)
+    {
+        Console.WriteLine("PresentMon fehlt. Herunterladen (ca. 1 MB, Intel, Open Source)? [j/N]");
+        if (Console.ReadLine()?.Trim().ToLowerInvariant() is "j" or "ja" or "y")
+            Console.WriteLine("Gespeichert: " + await GameDoctor.Core.Performance.PresentMonTool.DownloadAsync());
+    }
+
+    using var rec = new GameDoctor.Core.Performance.PerformanceRecorder(process);
+    rec.LiveUpdated += s => Console.Write(
+        $"\r{s.Elapsed:mm\\:ss}  {(s.GameRunning ? "" : "[Spiel läuft nicht] ")}FPS {s.Fps?.ToString("F0") ?? "–",4}  1%Low {s.OnePercentLowFps?.ToString("F0") ?? "–",4}  " +
+        $"CPU {s.CpuTotalPct,3:F0}% (Kern max {s.CpuMaxCorePct,3:F0}%)  GPU {s.GpuUtilPct?.ToString("F0") ?? "–",3}%  " +
+        $"VRAM {(s.VramUsedMb ?? 0) / 1024:F1}/{(s.VramTotalMb ?? 0) / 1024:F1} GB  {s.GpuTempC?.ToString("F0") ?? "–"}°C  {s.Bottleneck ?? ""}      ");
+    rec.Start();
+    Console.WriteLine(seconds > 0 ? $"Aufnahme läuft {seconds} s …" : "Aufnahme läuft – Enter zum Beenden.");
+
+    if (seconds > 0) await Task.Delay(TimeSpan.FromSeconds(seconds));
+    else await Task.Run(() => Console.ReadLine());
+
+    var recording = rec.Stop();
+    Console.WriteLine();
+    Console.WriteLine();
+    var report = GameDoctor.Core.Performance.PerformanceAnalyzer.Analyze(recording, GameDoctor.Core.Games.Cyberpunk.CyberpunkSettings.TryLoad());
+    if (report.SettingsSummary is not null) Console.WriteLine("Einstellungen: " + report.SettingsSummary);
+    Console.WriteLine();
+    foreach (var f in report.Findings) PrintFinding(f);
+}
 
 // Technische Detailansicht eines einzelnen Dumps (für Entwicklung/Fehlersuche)
 static void DumpDetails(string path, string? gamePath)

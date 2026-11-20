@@ -44,6 +44,15 @@ public sealed class SeverityLabelConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
+/// <summary>Anteil (0–1) als Stern-Breite für Grid-Spalten.</summary>
+public sealed class ShareToStarConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        new GridLength(value is double d ? Math.Max(d, 0.0001) : 0.0001, GridUnitType.Star);
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
 /// <summary>Blendet Elemente aus, wenn der Wert null, leer oder eine leere Liste ist.</summary>
 public sealed class NullToCollapsedConverter : IValueConverter
 {

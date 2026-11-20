@@ -13,6 +13,14 @@ Absturz- und Performance-Analyse für Cyberpunk 2077 (später weitere Spiele).
 - prüft die Windows-Ereignisanzeige (Treiber-Timeouts, Hardwarefehler, Neustarts)
 - prüft das System (RAM, freier Speicher, SSD/HDD)
 
+**Performance-Analyse** – erste Version:
+
+- Frame-Daten über PresentMon (Intel, Open Source; wird nach Zustimmung heruntergeladen, SHA-256-geprüft)
+- Sensoren: CPU je Kern, GPU-Last/VRAM/Temperatur/Takt/Drosselung über NVML (NVIDIA), RAM und Auslagerung
+- Auswertung: Ø FPS, 1 %/0,1 % Low, Ruckler, CPU- vs. GPU-Limit, VRAM-/RAM-Engpässe, thermische Drosselung
+- Empfehlungen auf Basis der echten Spieleinstellungen (`UserSettings.json`)
+- Kommandozeile: `gamedoctor perf [--seconds 60]`
+
 ## Benutzung
 
 Oberfläche (Übersicht, Absturzliste mit Details, Mods & System):
@@ -43,5 +51,5 @@ Optionen: `--game <Spielordner>`, `--days 30`, `--details 5`, `--out bericht.md`
 
 ## Nächste Schritte
 
-1. Performance-Aufzeichnung (PresentMon, CPU/GPU-Limit-Erkennung)
-2. Overlay
+1. Overlay
+2. Sensoren für AMD/Intel-GPUs und CPU-Temperatur

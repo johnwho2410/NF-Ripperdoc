@@ -67,8 +67,75 @@ public sealed class CrashViewModel
     public string Folder => Case.Report.Folder;
 }
 
+/// <summary>Zustand des Performance-Tabs.</summary>
+public sealed class PerformanceViewModel : ObservableObject
+{
+    private bool _isRecording;
+    private bool _presentMonAvailable;
+    private bool _hasReport;
+    private string _hint = "";
+    private string _settingsSummary = "";
+    private IReadOnlyList<(double Sec, double Ms)>? _series;
+    private IReadOnlyList<(double Sec, double Ms)>? _stutters;
+    private double _gpuShare, _cpuShare, _capShare;
+
+    public bool IsRecording { get => _isRecording; set { if (Set(ref _isRecording, value)) Raise(nameof(RecordButtonText)); } }
+    public string RecordButtonText => IsRecording ? "■  Aufnahme beenden" : "●  Aufnahme starten";
+    public bool PresentMonAvailable { get => _presentMonAvailable; set { if (Set(ref _presentMonAvailable, value)) Raise(nameof(PresentMonMissing)); } }
+    public bool PresentMonMissing => !_presentMonAvailable;
+    public bool HasReport { get => _hasReport; set => Set(ref _hasReport, value); }
+    public string Hint { get => _hint; set => Set(ref _hint, value); }
+    public string SettingsSummary { get => _settingsSummary; set => Set(ref _settingsSummary, value); }
+    public IReadOnlyList<(double Sec, double Ms)>? Series { get => _series; set => Set(ref _series, value); }
+    public IReadOnlyList<(double Sec, double Ms)>? Stutters { get => _stutters; set => Set(ref _stutters, value); }
+
+    // Anteile für den Flaschenhals-Balken (als Sternbreiten)
+    public double GpuShare { get => _gpuShare; set { Set(ref _gpuShare, value); Raise(nameof(ShareText)); } }
+    public double CpuShare { get => _cpuShare; set { Set(ref _cpuShare, value); Raise(nameof(ShareText)); } }
+    public double CapShare { get => _capShare; set { Set(ref _capShare, value); Raise(nameof(ShareText)); } }
+    public string ShareText => $"GPU-Limit {GpuShare * 100:F0} %   ·   CPU-Limit {CpuShare * 100:F0} %   ·   begrenzt (FPS-Limit/VSync) {CapShare * 100:F0} %";
+
+    public ObservableCollection<StatTile> LiveTiles { get; } = [];
+    public ObservableCollection<StatTile> ResultTiles { get; } = [];
+    public ObservableCollection<Finding> Findings { get; } = [];
+
+    public void ShowLive(GameDoctor.Core.Performance.LiveStats s)
+    {
+        LiveTiles.Clear();
+        LiveTiles.Add(new StatTile(s.Fps?.ToString("F0") ?? "–", "FPS", s.FrameTimeMs is double ft ? $"{ft:F1} ms" : null));
+        LiveTiles.Add(new StatTile(s.OnePercentLowFps?.ToString("F0") ?? "–", "1 % Low (10 s)"));
+        LiveTiles.Add(new StatTile($"{s.CpuMaxCorePct:F0} %", "CPU stärkster Kern", $"gesamt {s.CpuTotalPct:F0} %"));
+        LiveTiles.Add(new StatTile(s.GpuUtilPct is double g ? $"{g:F0} %" : "–", "GPU-Last", s.GpuTempC is double t ? $"{t:F0} °C" : null));
+        LiveTiles.Add(new StatTile(s.VramUsedMb is double u ? $"{u / 1024:F1} GB" : "–", "VRAM", s.VramTotalMb is double tot ? $"von {tot / 1024:F1} GB" : null));
+        LiveTiles.Add(new StatTile(s.Bottleneck ?? "–", "aktuell", $"{s.Elapsed:mm\\:ss} · {s.FrameCount:N0} Frames"));
+        Hint = s.GameRunning
+            ? (s.FrameCount == 0 ? "Cyberpunk läuft – warte auf die ersten Frames …" : "Aufnahme läuft. Spiel ganz normal – am aussagekräftigsten sind 2–5 Minuten in der Stadt oder beim Fahren.")
+            : "Warte auf Cyberpunk 2077 … Starte das Spiel, die Aufnahme beginnt automatisch.";
+    }
+
+    public void ShowReport(GameDoctor.Core.Performance.PerformanceReport r)
+    {
+        ResultTiles.Clear();
+        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.AvgFps.ToString("F0") : "–", "Ø FPS"));
+        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.OnePercentLowFps.ToString("F0") : "–", "1 % Low"));
+        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.PointOnePercentLowFps.ToString("F0") : "–", "0,1 % Low"));
+        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.StuttersPerMinute.ToString("F1") : "–", "Ruckler pro Minute", $"{r.StutterCount} insgesamt"));
+        GpuShare = r.GpuLimitedShare;
+        CpuShare = r.CpuLimitedShare;
+        CapShare = r.CappedShare;
+        Series = r.FrameTimeSeries;
+        Stutters = r.Stutters;
+        SettingsSummary = r.SettingsSummary is null ? "" : "Spieleinstellungen: " + r.SettingsSummary;
+        Findings.Clear();
+        foreach (var f in r.Findings.OrderByDescending(f => f.Severity)) Findings.Add(f);
+        HasReport = true;
+    }
+}
+
 public sealed class MainViewModel : ObservableObject
 {
+    public PerformanceViewModel Perf { get; } = new();
+
     private bool _isBusy;
     private string _status = "Bereit";
     private string _gameInfo = "Noch keine Analyse";
