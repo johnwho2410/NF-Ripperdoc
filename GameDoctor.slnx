@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GameDoctor.App/GameDoctor.App.csproj" />
+    <Project Path="src/GameDoctor.Cli/GameDoctor.Cli.csproj" />
+    <Project Path="src/GameDoctor.Core/GameDoctor.Core.csproj" />
+  </Folder>
+</Solution>
