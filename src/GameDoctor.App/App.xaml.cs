@@ -1,6 +1,4 @@
-﻿using System.Configuration;
-using System.Data;
-using System.Windows;
+﻿using System.Windows;
 
 namespace GameDoctor.App;
 
@@ -9,5 +7,10 @@ namespace GameDoctor.App;
 /// </summary>
 public partial class App : Application
 {
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        // Gespeicherten Skin laden, bevor das erste Fenster erscheint.
+        ThemeManager.ApplySaved();
+        base.OnStartup(e);
+    }
 }
-

@@ -4,22 +4,22 @@
         Title="KI-Einstellungen"
         Width="720" SizeToContent="Height" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
-        Background="{StaticResource Bg}" Foreground="{StaticResource Text}"
-        FontFamily="Segoe UI" FontSize="13" UseLayoutRounding="True">
+        Background="{DynamicResource WindowBackdrop}" Foreground="{DynamicResource Text}"
+        FontFamily="{DynamicResource BodyFont}" FontSize="13" UseLayoutRounding="True">
     <Window.Resources>
         <Style x:Key="Field" TargetType="Control">
-            <Setter Property="Background" Value="{StaticResource PanelHi}"/>
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+            <Setter Property="Background" Value="{DynamicResource PanelHi}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,6"/>
             <Setter Property="Margin" Value="0,4,0,0"/>
         </Style>
         <Style TargetType="TextBox" BasedOn="{StaticResource Field}">
-            <Setter Property="CaretBrush" Value="{StaticResource Text}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource Text}"/>
         </Style>
         <Style TargetType="PasswordBox" BasedOn="{StaticResource Field}">
-            <Setter Property="CaretBrush" Value="{StaticResource Text}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource Text}"/>
         </Style>
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Margin" Value="0,14,0,0"/>
@@ -33,7 +33,7 @@
                    Text="GameDoctor hat keinen eigenen KI-Zugang. Du nutzt deinen eigenen Anbieter, oder ein Modell, das lokal auf deinem PC läuft. Daten werden nur verschickt, wenn du auf „Mit KI auswerten“ klickst."/>
 
         <TextBlock Text="Anbieter" Style="{StaticResource Label}"/>
-        <Border Background="{StaticResource Panel}" CornerRadius="7" Padding="3" Margin="0,6,0,0" HorizontalAlignment="Left">
+        <Border Background="{DynamicResource Panel}" CornerRadius="{DynamicResource CornerS}" Padding="3" Margin="0,6,0,0" HorizontalAlignment="Left">
             <StackPanel x:Name="ProviderPanel" Orientation="Horizontal"/>
         </Border>
         <TextBlock x:Name="ProviderHint" Style="{StaticResource Muted}" Margin="0,8,0,0"/>
@@ -55,7 +55,7 @@
             <TextBox x:Name="ModelBox" Margin="0"/>
         </DockPanel>
         <ListBox x:Name="ModelList" MaxHeight="160" Margin="0,6,0,0" Visibility="Collapsed"
-                 Background="{StaticResource Panel}" Foreground="{StaticResource Text}" BorderBrush="{StaticResource Line}"
+                 Background="{DynamicResource Panel}" Foreground="{DynamicResource Text}" BorderBrush="{DynamicResource Line}"
                  SelectionChanged="ModelList_SelectionChanged"/>
 
         <TextBlock x:Name="StatusText" Margin="0,14,0,0" TextWrapping="Wrap"/>

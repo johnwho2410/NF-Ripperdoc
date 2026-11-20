@@ -212,6 +212,30 @@ public partial class MainWindow : Window
         new PromptWindow(_vm.Result, focus, _vm.Perf.LastReport) { Owner = this }.Show();
     }
 
+    // ------------------------------------------------------------------ Skin
+
+    private void Skin_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu
+        {
+            PlacementTarget = SkinButton,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+        };
+        foreach (var skin in ThemeManager.Skins)
+        {
+            var item = new MenuItem
+            {
+                Header = skin.Name,
+                ToolTip = skin.Description,
+                IsCheckable = true,
+                IsChecked = skin.Id == ThemeManager.Current.Id,
+            };
+            item.Click += (_, _) => ThemeManager.Apply(skin.Id);
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
+    }
+
     private void UseDarkTitleBar() => DarkTitleBar.Apply(this);
 }
 
