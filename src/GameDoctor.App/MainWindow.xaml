@@ -186,6 +186,7 @@
                     <!-- Steuerung -->
                     <DockPanel Margin="0,0,0,16">
                         <Button DockPanel.Dock="Left" Content="{Binding RecordButtonText}" Style="{StaticResource PrimaryButton}" Click="Record_Click" Padding="18,9" FontSize="14"/>
+                        <Button DockPanel.Dock="Right" Content="Aufnahme öffnen …" Click="OpenRecording_Click" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding Hint}" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </DockPanel>
 

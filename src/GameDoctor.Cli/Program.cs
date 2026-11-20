@@ -85,10 +85,23 @@ static async Task RunPerf(string[] args)
 {
     int seconds = 0;
     string process = "Cyberpunk2077.exe";
+    string? load = null;
     for (int i = 0; i < args.Length; i++)
     {
         if (args[i] == "--seconds") seconds = int.Parse(args[++i]);
         else if (args[i] == "--process") process = args[++i];
+        else if (args[i] == "--load") load = args[++i];
+    }
+
+    // Gespeicherte Aufnahme neu auswerten: --load <Datei> oder --load latest
+    if (load is not null)
+    {
+        var file = load == "latest" ? GameDoctor.Core.Performance.RecordingStore.Latest() : load;
+        if (file is null) { Console.WriteLine("Keine gespeicherte Aufnahme gefunden."); return; }
+        var loaded = GameDoctor.Core.Performance.RecordingStore.Load(file);
+        Console.WriteLine($"Aufnahme {Path.GetFileName(file)}: {loaded.Frames.Count:N0} Frames, {loaded.Sensors.Count} Sensorwerte, {loaded.Duration:mm\\:ss} min");
+        PrintPerfReport(GameDoctor.Core.Performance.PerformanceAnalyzer.Analyze(loaded, GameDoctor.Core.Games.Cyberpunk.CyberpunkSettings.TryLoad()));
+        return;
     }
 
     if (GameDoctor.Core.Performance.PresentMonTool.Find() is null)
@@ -112,10 +125,16 @@ static async Task RunPerf(string[] args)
     var recording = rec.Stop();
     Console.WriteLine();
     Console.WriteLine();
-    var report = GameDoctor.Core.Performance.PerformanceAnalyzer.Analyze(recording, GameDoctor.Core.Games.Cyberpunk.CyberpunkSettings.TryLoad());
+    if (recording.Frames.Count > 0) Console.WriteLine("Gespeichert: " + GameDoctor.Core.Performance.RecordingStore.Save(recording));
+    PrintPerfReport(GameDoctor.Core.Performance.PerformanceAnalyzer.Analyze(recording, GameDoctor.Core.Games.Cyberpunk.CyberpunkSettings.TryLoad()));
+}
+
+static void PrintPerfReport(GameDoctor.Core.Performance.PerformanceReport report)
+{
     if (report.SettingsSummary is not null) Console.WriteLine("Einstellungen: " + report.SettingsSummary);
+    Console.WriteLine($"Flaschenhals (Spielzeit): GPU {report.GpuLimitedShare * 100:F0} % · CPU {report.CpuLimitedShare * 100:F0} % · begrenzt {report.CappedShare * 100:F0} %");
     Console.WriteLine();
-    foreach (var f in report.Findings) PrintFinding(f);
+    foreach (var f in report.Findings.OrderByDescending(f => f.Severity)) PrintFinding(f);
 }
 
 // Technische Detailansicht eines einzelnen Dumps (für Entwicklung/Fehlersuche)

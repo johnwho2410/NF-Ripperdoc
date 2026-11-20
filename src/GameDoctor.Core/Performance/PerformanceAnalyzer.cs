@@ -22,6 +22,8 @@ public sealed class PerformanceReport
     /// <summary>Frametime-Verlauf für Diagramme (Sekunde, ms) – ausgedünnt, Spitzen bleiben erhalten.</summary>
     public List<(double Sec, double Ms)> FrameTimeSeries { get; init; } = [];
     public List<(double Sec, double Ms)> Stutters { get; init; } = [];
+    public double ExcludedSeconds { get; init; }
+    public List<(double Sec, double Ms)> LoadPauses { get; init; } = [];
 }
 
 /// <summary>Wertet eine Aufnahme aus: FPS-Kennzahlen, Flaschenhals, Ruckler, Hardware-Limits, Empfehlungen.</summary>
@@ -70,10 +72,71 @@ public static class PerformanceAnalyzer
         return g switch { FrameLimit.Gpu => "GPU-Limit", FrameLimit.Cpu => "CPU-Limit", _ => "FPS-Limit / VSync" };
     }
 
+    public sealed record GameplaySelection(List<FrameSample> Frames, double ExcludedSeconds, List<(double Sec, double Ms)> LoadPauses)
+    {
+        /// <summary>Frames der Nachladephase direkt nach einem Spielstand-Ladevorgang (separat bewertet).</summary>
+        public List<FrameSample> WarmupFrames { get; init; } = [];
+    }
+
+    private const double LongLoadMs = 5000;
+    // Mit vielen Mods dauert das Nachstreamen nach dem Laden spürbar länger (gemessen: ~50 s bei 300+ Archive-Mods)
+    private const double WarmupMs = 60000;
+
+    /// <summary>
+    /// Trennt echtes Spielen von Hauptmenü, Ladebildschirmen und dem Fensterwechsel am Ende.
+    /// - Frames ≥ 1 s sind Ladepausen (kein „Ruckler“).
+    /// - Sekunden mit extrem hoher Bildrate (Menüs/Ladebildschirme rendern oft mit mehreren hundert FPS) fliegen raus.
+    /// - Die letzten 3 s werden verworfen: dort wechselt der Spieler meist zurück zu GameDoctor.
+    /// </summary>
+    public static GameplaySelection SelectGameplay(List<FrameSample> frames)
+    {
+        var loadPauses = frames.Where(f => f.FrameTimeMs >= 1000).Select(f => (f.TimeMs / 1000, f.FrameTimeMs)).ToList();
+        if (frames.Count == 0) return new([], 0, loadPauses);
+
+        double endMs = frames[^1].TimeMs - 3000;
+        var candidates = frames.Where(f => f.FrameTimeMs < 1000 && f.TimeMs <= endMs).ToList();
+
+        // Langer Ladevorgang (Spielstand laden): alles davor ist Menü, die 60 s danach lädt das Spiel die Umgebung nach
+        var warmup = new List<FrameSample>();
+        var longLoads = frames.Where(f => f.FrameTimeMs >= LongLoadMs).Select(f => f.TimeMs).ToList();
+        if (longLoads.Count > 0)
+        {
+            double firstLoadEnd = longLoads[0];
+            candidates = candidates.Where(f => f.TimeMs > firstLoadEnd).ToList();
+            bool InWarmup(FrameSample f) => longLoads.Any(end => f.TimeMs > end && f.TimeMs <= end + WarmupMs);
+            warmup = candidates.Where(InWarmup).ToList();
+            candidates = candidates.Where(f => !InWarmup(f)).ToList();
+        }
+
+        var buckets = candidates.GroupBy(f => (long)(f.TimeMs / 1000))
+            .Select(g => (Sec: g.Key, Fps: 1000.0 * g.Count() / Math.Max(g.Sum(x => x.FrameTimeMs), 1), Frames: g.ToList()))
+            .ToList();
+        // Typische Spiel-Bildrate: Median über die Sekunden (zeitgewichtet), ohne offensichtliche Menü-Sekunden
+        var plausible = buckets.Where(b => b.Fps <= 240).Select(b => b.Fps).ToList();
+        double typical = plausible.Count > 0 ? Percentile(plausible, 50) : (buckets.Count > 0 ? Percentile(buckets.Select(b => b.Fps).ToList(), 50) : 0);
+        double menuThreshold = Math.Max(150, typical * 2.5);
+
+        var kept = new List<FrameSample>();
+        int excludedBuckets = 0;
+        foreach (var b in buckets)
+        {
+            if (b.Fps > menuThreshold) { excludedBuckets++; continue; }
+            kept.AddRange(b.Frames);
+        }
+
+        double recordedSec = (frames[^1].TimeMs - frames[0].TimeMs) / 1000;
+        double keptSec = kept.Sum(f => f.FrameTimeMs) / 1000;
+        double warmupSec = warmup.Sum(f => f.FrameTimeMs) / 1000;
+        double excluded = Math.Max(0, recordedSec - keptSec - warmupSec - loadPauses.Sum(p => p.Item2) / 1000);
+        return new(kept, excluded, loadPauses) { WarmupFrames = warmup };
+    }
+
     public static PerformanceReport Analyze(PerformanceRecording rec, CyberpunkSettings? settings)
     {
-        var frames = MainSwapChain(rec.Frames);
+        var allFrames = MainSwapChain(rec.Frames);
         var sensors = rec.Sensors;
+        var gameplay = SelectGameplay(allFrames);
+        var frames = gameplay.Frames;
         var ft = frames.Select(f => f.FrameTimeMs).ToList();
 
         if (frames.Count < 30)
@@ -95,10 +158,10 @@ public static class PerformanceAnalyzer
         double p99 = Percentile(ft, 99);
         double p999 = Percentile(ft, 99.9);
 
-        var limits = frames.Select(Classify).ToList();
-        double gpuShare = limits.Count(l => l == FrameLimit.Gpu) / (double)limits.Count;
-        double cpuShare = limits.Count(l => l == FrameLimit.Cpu) / (double)limits.Count;
-        double capShare = 1 - gpuShare - cpuShare;
+        // Anteile nach Spielzeit gewichten (nicht nach Frame-Anzahl) – sonst dominieren kurze Frames
+        double gpuShare = frames.Where(x => Classify(x) == FrameLimit.Gpu).Sum(x => x.FrameTimeMs) / total;
+        double cpuShare = frames.Where(x => Classify(x) == FrameLimit.Cpu).Sum(x => x.FrameTimeMs) / total;
+        double capShare = Math.Max(0, 1 - gpuShare - cpuShare);
 
         // Scheinbares CPU-Limit, das in Wahrheit ein FPS-Limiter ist?
         var activeSensors = sensors.Where(s => s.GameRunning).ToList();
@@ -142,16 +205,40 @@ public static class PerformanceAnalyzer
             SettingsSummary = settings?.Summary(),
             FrameTimeSeries = Downsample(frames, 1500),
             Stutters = stutters,
+            ExcludedSeconds = gameplay.ExcludedSeconds,
+            LoadPauses = gameplay.LoadPauses,
         };
 
         var f = report.Findings;
         bool isRtx4050 = rec.GpuName is { } gn && (gn.Contains("RTX 40") || gn.Contains("RTX 50"));
 
         // --- Überblick
+        var excludedText = gameplay.ExcludedSeconds >= 1 || gameplay.LoadPauses.Count > 0
+            ? $" Nicht mitgezählt: {gameplay.ExcludedSeconds:F0} s Menü/Ladebildschirm/Fensterwechsel" +
+              (gameplay.LoadPauses.Count > 0 ? $" und {gameplay.LoadPauses.Count} Ladepause(n) (längste {gameplay.LoadPauses.Max(p => p.Ms) / 1000:F1} s)." : ".")
+            : "";
         f.Add(new Finding(Severity.Info, $"Ø {avgFps:F0} FPS · 1 % Low {report.OnePercentLowFps:F0} FPS · 0,1 % Low {report.PointOnePercentLowFps:F0} FPS",
-            $"{frames.Count:N0} Frames in {TimeSpan.FromMilliseconds(total):m\\:ss} min. Median-Frametime {median:F1} ms. " +
+            $"{frames.Count:N0} Frames in {TimeSpan.FromMilliseconds(total):m\\:ss} min Spielzeit. Median-Frametime {median:F1} ms.{excludedText} " +
             "„1 % Low“ ist die Bildrate der langsamsten 1 % der Frames – sie bestimmt, wie flüssig sich das Spiel anfühlt.")
         { Category = "Überblick" });
+
+        // --- Nachladephase nach dem Laden eines Spielstands
+        var warm = gameplay.WarmupFrames;
+        if (warm.Count >= 30)
+        {
+            var wft = warm.Select(x => x.FrameTimeMs).ToList();
+            int warmHitches = wft.Count(x => x > 2 * median && x > median + 12);
+            double warmSec = wft.Sum() / 1000;
+            double warmLow = 1000 / Percentile(wft, 99);
+            bool bad = warmHitches / Math.Max(warmSec / 60, 0.1) > 3 * Math.Max(report.StuttersPerMinute, 1);
+            f.Add(new Finding(bad ? Severity.Hint : Severity.Info,
+                $"Nachladephase nach dem Laden: {warmHitches} Ruckler in {warmSec:F0} s",
+                $"Direkt nach dem Laden eines Spielstands streamt Cyberpunk Texturen, Modelle und Skripte der Umgebung nach (1 % Low hier {warmLow:F0} FPS). " +
+                "Diese Phase ist getrennt ausgewertet und fließt nicht in die Werte oben ein." +
+                (bad ? " Sie ist bei dir deutlich unruhiger als das normale Spielen – typisch für sehr viele Mods (jede Archive-Mod muss beim Laden mit eingelesen werden) und knappen Arbeitsspeicher." : ""),
+                bad ? "Nach dem Laden etwa eine Minute ruhig spielen (nicht sofort losfahren), bis die Umgebung fertig geladen ist. Dauerhaft helfen weniger Archive-Mods und mehr RAM." : null)
+            { Category = "Ruckler" });
+        }
 
         // --- Flaschenhals
         string pct(double x) => $"{x * 100:F0} %";
@@ -172,8 +259,8 @@ public static class PerformanceAnalyzer
                     recs.Add("DLSS Frame Generation einschalten (deine GPU unterstützt es; ab ca. 40–50 Basis-FPS sinnvoll)");
             }
             f.Add(new Finding(avgFps < 55 ? Severity.Hint : Severity.Info,
-                $"Die Grafikkarte begrenzt die Bildrate ({pct(gpuShare)} der Frames)",
-                $"Die GPU war in {pct(gpuShare)} der Frames voll ausgelastet, die CPU hätte mehr Bilder liefern können. Das ist der Normalfall – mehr FPS gibt es hier nur über die Grafikeinstellungen.",
+                $"Die Grafikkarte begrenzt die Bildrate ({pct(gpuShare)} der Spielzeit)",
+                $"Die GPU war {pct(gpuShare)} der Zeit voll ausgelastet, die CPU hätte mehr Bilder liefern können. Das ist der Normalfall – mehr FPS gibt es hier nur über die Grafikeinstellungen.",
                 recs.Count > 0 ? "Mögliche Stellschrauben, größter Effekt zuerst – jeweils neu messen." : null,
                 recs.Count > 0 ? recs : null)
             { Category = "Flaschenhals" });
@@ -188,8 +275,8 @@ public static class PerformanceAnalyzer
             recs.Add("Skript-lastige Mods (z. B. NPC-/Verkehrs-/KI-Mods) belasten den Hauptthread");
             recs.Add("Hintergrundprogramme (Browser, Overlays, Aufnahme) beim Spielen schließen");
             f.Add(new Finding(avgFps < 55 ? Severity.Warning : Severity.Hint,
-                $"Der Prozessor begrenzt die Bildrate ({pct(cpuShare)} der Frames)",
-                $"In {pct(cpuShare)} der Frames hat die GPU auf die CPU gewartet. Der am stärksten ausgelastete Kern lag im Schnitt bei {maxCore:F0} %. " +
+                $"Der Prozessor begrenzt die Bildrate ({pct(cpuShare)} der Spielzeit)",
+                $"{pct(cpuShare)} der Zeit hat die GPU auf die CPU gewartet. Der am stärksten ausgelastete Kern lag im Schnitt bei {maxCore:F0} %. " +
                 "Spiele hängen oft an einem einzelnen Hauptthread – die Gesamtauslastung wirkt dann niedrig, obwohl die CPU limitiert.",
                 "Mit dem ersten Punkt anfangen und jeweils neu messen.", recs)
             { Category = "Flaschenhals" });
@@ -202,14 +289,14 @@ public static class PerformanceAnalyzer
                 { FpsCapOn: true } => $"Im Spiel ist ein FPS-Limit von {settings.FpsCap} gesetzt.",
                 _ => "Vermutlich durch ein FPS-Limit im Programm selbst, im Treiber/RTSS oder durch VSync/G-Sync im Treiber.",
             };
-            f.Add(new Finding(Severity.Info, $"Bildrate ist begrenzt ({pct(capShare)} der Frames)",
+            f.Add(new Finding(Severity.Info, $"Bildrate ist begrenzt ({pct(capShare)} der Spielzeit)",
                 $"Weder CPU noch GPU waren voll ausgelastet – die Bildrate wird künstlich begrenzt. {why} Das ist gewollt und kein Problem.", null)
             { Category = "Flaschenhals" });
         }
         else
         {
             f.Add(new Finding(Severity.Info, "Wechselnder Flaschenhals",
-                $"GPU-Limit {pct(gpuShare)}, CPU-Limit {pct(cpuShare)}, begrenzt {pct(capShare)} der Frames. Je nach Szene limitiert mal die eine, mal die andere Komponente.", null)
+                $"GPU-Limit {pct(gpuShare)}, CPU-Limit {pct(cpuShare)}, begrenzt {pct(capShare)} der Spielzeit. Je nach Szene limitiert mal die eine, mal die andere Komponente.", null)
             { Category = "Flaschenhals" });
         }
 
@@ -217,23 +304,37 @@ public static class PerformanceAnalyzer
         if (report.StuttersPerMinute >= 2)
         {
             var causes = new List<string>();
+            static bool VramFull(SensorSample s) => s.VramUsedMb is double u && s.VramTotalMb is double t && u >= 0.95 * t;
+            static bool RamTight(SensorSample s) => s.CommitUsedGb >= 0.9 * s.CommitLimitGb || s.RamUsedGb >= 0.92 * s.RamTotalGb;
+
             int vramHits = 0, ramHits = 0;
             foreach (var (sec, _) in stutters)
             {
                 var s = sensors.MinBy(x => Math.Abs(x.TimeMs / 1000 - sec));
                 if (s is null) continue;
-                if (s.VramUsedMb is double u && s.VramTotalMb is double t && u >= 0.95 * t) vramHits++;
-                if (s.CommitUsedGb >= 0.9 * s.CommitLimitGb || s.RamUsedGb >= 0.92 * s.RamTotalGb) ramHits++;
+                if (VramFull(s)) vramHits++;
+                if (RamTight(s)) ramHits++;
             }
-            if (stutters.Count > 0 && vramHits >= stutters.Count / 2) causes.Add($"{vramHits} von {stutters.Count} Rucklern bei fast vollem VRAM → Texturen werden nachgeladen");
-            if (stutters.Count > 0 && ramHits >= stutters.Count / 3) causes.Add($"{ramHits} Ruckler bei knappem Arbeitsspeicher → Windows lagert aus");
+            // Nur als Ursache werten, wenn Ruckler deutlich häufiger in diese Phasen fallen als es dem Zeitanteil entspricht
+            // (ist der Speicher die ganze Zeit knapp, sagt die Übereinstimmung nichts aus)
+            double vramBase = sensors.Count > 0 ? sensors.Count(VramFull) / (double)sensors.Count : 0;
+            double ramBase = sensors.Count > 0 ? sensors.Count(RamTight) / (double)sensors.Count : 0;
+            bool vramCause = stutters.Count > 0 && vramHits >= stutters.Count / 2 && vramHits / (double)stutters.Count >= vramBase + 0.25;
+            bool ramCause = stutters.Count > 0 && ramHits >= stutters.Count / 3 && ramHits / (double)stutters.Count >= ramBase + 0.25;
+            if (vramCause) causes.Add($"{vramHits} von {stutters.Count} Rucklern bei fast vollem VRAM (sonst nur {vramBase * 100:F0} % der Zeit) → Texturen werden nachgeladen");
+            if (ramCause) causes.Add($"{ramHits} von {stutters.Count} Rucklern bei knappem Arbeitsspeicher (sonst nur {ramBase * 100:F0} % der Zeit) → Windows lagert aus");
+            if (!vramCause && !ramCause && ramBase >= 0.8) causes.Add("Der Arbeitsspeicher war fast die ganze Zeit knapp – das kann Ruckler allgemein begünstigen");
             causes.AddRange(stutters.OrderByDescending(s => s.Ms).Take(5).Select(s => $"Spitze bei {TimeSpan.FromSeconds(s.Sec):m\\:ss}: {s.Ms:F0} ms"));
 
             f.Add(new Finding(report.StuttersPerMinute >= 6 ? Severity.Warning : Severity.Hint,
                 $"{stutters.Count} Ruckler ({report.StuttersPerMinute:F1} pro Minute)",
                 "Einzelne Frames dauerten deutlich länger als ihre Nachbarn – das spürt man als Ruckeln, auch bei hohen Durchschnitts-FPS. " +
                 "Typische Ursachen in Cyberpunk: Nachladen beim schnellen Fahren, voller VRAM, Shader-Kompilierung nach Treiber-Updates, Hintergrundprozesse.",
-                vramHits > 0 ? "VRAM entlasten (Texturqualität/Raytracing reduzieren)." : "Beim schnellen Fahren normal; bei Ruckeln im Stand Hintergrundprogramme und Mods prüfen.",
+                ramCause || (!vramCause && ramBase >= 0.8)
+                    ? "Zuerst den Arbeitsspeicher entlasten – siehe Hinweis zum virtuellen Speicher/zur Auslagerungsdatei."
+                    : vramCause
+                        ? "VRAM entlasten (Texturqualität/Raytracing reduzieren)."
+                        : "Beim schnellen Fahren normal; bei Ruckeln im Stand Hintergrundprogramme und Mods prüfen.",
                 causes)
             { Category = "Ruckler" });
         }
@@ -300,9 +401,37 @@ public static class PerformanceAnalyzer
         double maxRam = ingame.Max(s => s.RamUsedGb / s.RamTotalGb);
         double maxCommit = ingame.Max(s => s.CommitUsedGb / s.CommitLimitGb);
         if (maxCommit >= 0.9)
+        {
+            var peak = ingame.MaxBy(s => s.CommitUsedGb / s.CommitLimitGb)!;
+            var pf = Platform.PageFileInfo.Read();
+            // Ziel: Commit-Limit mit 40 % Reserve über der gemessenen Spitze, auf 8 GB gerundet
+            double targetLimitGb = peak.CommitUsedGb * 1.4;
+            int suggestedMb = (int)Math.Ceiling(Math.Max(targetLimitGb - peak.RamTotalGb, 16) / 8) * 8 * 1024;
+            var evidence = new List<string>
+            {
+                $"Spitze: {peak.CommitUsedGb:F1} von {peak.CommitLimitGb:F1} GB belegt (RAM {peak.RamTotalGb:F0} GB + Auslagerungsdatei)",
+                $"Aktuelle Einstellung: {pf.Describe()}",
+            };
+            string rec;
+            var fixedFile = pf.Files.FirstOrDefault(x => !x.SystemManaged);
+            if (fixedFile is not null && fixedFile.InitialMb < suggestedMb)
+            {
+                rec = $"Anfangsgröße der Auslagerungsdatei auf {fixedFile.Drive} von {fixedFile.InitialMb:N0} MB auf {suggestedMb:N0} MB erhöhen " +
+                      $"(Maximum mindestens gleich groß). Windows vergrößert sie sonst erst im Notfall – das verursacht Ruckler und kann Abstürze auslösen. " +
+                      "Einstellung: Windows-Suche „Erweiterte Systemeinstellungen“ → Leistung → Einstellungen → Erweitert → Virtueller Arbeitsspeicher → Ändern. Danach neu starten.";
+                if (fixedFile.DriveFreeGb is double free)
+                    evidence.Add($"Freier Platz auf Laufwerk {fixedFile.Drive} {free:F0} GB");
+            }
+            else
+            {
+                rec = "Auslagerungsdatei auf einer SSD mit genug freiem Platz automatisch verwalten lassen, Hintergrundprogramme schließen. " +
+                      "Bei sehr vielen Mods sind 32 GB RAM die eigentliche Lösung.";
+            }
             f.Add(new Finding(Severity.Critical, $"Virtueller Speicher fast erschöpft ({maxCommit * 100:F0} %)",
-                "Arbeitsspeicher plus Auslagerungsdatei sind fast voll. Läuft er über, stürzt das Spiel ohne klare Fehlermeldung ab.",
-                "Auslagerungsdatei auf „automatisch“ stellen, Platz auf C: schaffen, Hintergrundprogramme schließen.") { Category = "Speicher" });
+                "Arbeitsspeicher plus Auslagerungsdatei waren fast vollständig belegt. Läuft der virtuelle Speicher über, stürzt das Spiel ohne klare Fehlermeldung ab – " +
+                "das ist eine häufige Ursache für Abstürze „in der Engine“ bei stark gemoddeten Spielen.",
+                rec, evidence) { Category = "Speicher" });
+        }
         else if (maxRam >= 0.9)
             f.Add(new Finding(Severity.Warning, $"Arbeitsspeicher fast voll ({maxRam * 100:F0} %)",
                 $"Spitzenbelegung {ingame.Max(s => s.RamUsedGb):F1} von {ingame[0].RamTotalGb:F0} GB. Windows beginnt auszulagern – das verursacht Ruckler.",

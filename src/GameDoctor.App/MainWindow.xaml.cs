@@ -84,7 +84,48 @@ public partial class MainWindow : Window
     {
         _vm.Perf.PresentMonAvailable = PresentMonTool.Find() is not null;
         _vm.Perf.Hint = "Starte die Aufnahme, wechsle ins Spiel und spiele 2–5 Minuten. Danach hier auf „Aufnahme beenden“.";
-        Closing += (_, _) => _recorder?.Stop();
+        Closing += (_, _) =>
+        {
+            // Läuft beim Schließen noch eine Aufnahme, wird sie wenigstens gespeichert
+            if (_recorder is not null)
+            {
+                var rec = _recorder.Stop();
+                if (rec.Frames.Count > 0) try { RecordingStore.Save(rec); } catch { /* egal */ }
+            }
+        };
+
+        // Letzte Aufnahme anzeigen, damit das Ergebnis nach einem Neustart nicht weg ist
+        if (RecordingStore.Latest() is { } latest)
+        {
+            try { ShowRecording(RecordingStore.Load(latest), $"Letzte Aufnahme geladen ({File.GetLastWriteTime(latest):dd.MM. HH:mm})."); }
+            catch { /* defekte Datei ignorieren */ }
+        }
+    }
+
+    private void ShowRecording(PerformanceRecording recording, string hint)
+    {
+        var report = PerformanceAnalyzer.Analyze(recording, CyberpunkSettings.TryLoad());
+        _vm.Perf.ShowReport(report);
+        _vm.Perf.Hint = hint;
+    }
+
+    private void OpenRecording_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Aufnahme öffnen",
+            Filter = "GameDoctor-Aufnahme (*.json.gz)|*.json.gz",
+            InitialDirectory = Directory.Exists(RecordingStore.Dir) ? RecordingStore.Dir : null,
+        };
+        if (dlg.ShowDialog(this) != true) return;
+        try
+        {
+            ShowRecording(RecordingStore.Load(dlg.FileName), $"Aufnahme geladen: {Path.GetFileName(dlg.FileName)}");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Aufnahme konnte nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void Record_Click(object sender, RoutedEventArgs e)
@@ -107,10 +148,14 @@ public partial class MainWindow : Window
         _recorder.Dispose();
         _recorder = null;
         perf.IsRecording = false;
-        var report = PerformanceAnalyzer.Analyze(recording, CyberpunkSettings.TryLoad());
-        perf.ShowReport(report);
-        perf.Hint = $"Aufnahme beendet: {recording.Duration:mm\\:ss} min, {report.FrameCount:N0} Frames.";
-        _vm.Status = perf.Hint;
+        string saved = "";
+        if (recording.Frames.Count > 0 || recording.Sensors.Count > 0)
+        {
+            try { saved = " Gespeichert unter " + RecordingStore.Save(recording); }
+            catch (Exception ex) { saved = " (Speichern fehlgeschlagen: " + ex.Message + ")"; }
+        }
+        ShowRecording(recording, $"Aufnahme beendet: {recording.Duration:mm\\:ss} min.");
+        _vm.Status = perf.Hint + saved;
     }
 
     private async void DownloadPresentMon_Click(object sender, RoutedEventArgs e)
