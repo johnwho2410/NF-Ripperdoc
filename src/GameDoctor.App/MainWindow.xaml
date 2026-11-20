@@ -34,8 +34,8 @@
                                 <RadioButton Style="{StaticResource Segment}" Content="90 Tage" Tag="90" GroupName="days" Checked="Days_Checked"/>
                             </StackPanel>
                         </Border>
-                        <Button Content="KI-Prompt" Margin="0,0,8,0" Click="Prompt_Click" IsEnabled="{Binding HasResult}"
-                                ToolTip="Alle Befunde als Text für ChatGPT, Claude &amp; Co. zusammenfassen"/>
+                        <Button Content="KI-Auswertung" Margin="0,0,8,0" Click="Prompt_Click" IsEnabled="{Binding HasResult}"
+                                ToolTip="Alle Befunde von einer KI auswerten lassen – direkt hier oder per Kopieren in ChatGPT, Claude &amp; Co."/>
                         <Button Content="Bericht speichern" Margin="0,0,8,0" Click="SaveReport_Click" IsEnabled="{Binding HasResult}"/>
                         <Button Content="Neu analysieren" Style="{StaticResource PrimaryButton}" Click="Analyze_Click" IsEnabled="{Binding IsIdle}"/>
                     </StackPanel>
@@ -120,7 +120,7 @@
                     <StackPanel MaxWidth="1000" HorizontalAlignment="Stretch">
                         <DockPanel>
                             <Button DockPanel.Dock="Right" Content="Ordner öffnen" Click="OpenFolder_Click" VerticalAlignment="Center"/>
-                            <Button DockPanel.Dock="Right" Content="KI-Prompt für diesen Absturz" Click="CrashPrompt_Click" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Button DockPanel.Dock="Right" Content="KI-Auswertung für diesen Absturz" Click="CrashPrompt_Click" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <StackPanel>
                                 <TextBlock Text="{Binding TimeText}" Style="{StaticResource H1}"/>
                                 <TextBlock Margin="0,2,0,0" Style="{StaticResource Muted}">
