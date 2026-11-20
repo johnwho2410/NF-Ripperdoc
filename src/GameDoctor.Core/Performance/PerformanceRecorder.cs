@@ -47,11 +47,21 @@ public sealed class PerformanceRecording
     public List<SensorSample> Sensors { get; } = [];
 }
 
-/// <summary>Live-Werte für die Anzeige während der Aufnahme.</summary>
+/// <summary>Live-Werte für die Anzeige während der Aufnahme (und für das Ingame-Overlay).</summary>
 public sealed record LiveStats(
     TimeSpan Elapsed, int FrameCount, double? Fps, double? FrameTimeMs, double? OnePercentLowFps,
     double CpuTotalPct, double CpuMaxCorePct, double? GpuUtilPct, double? VramUsedMb, double? VramTotalMb,
-    double? GpuTempC, bool GameRunning, string? Bottleneck);
+    double? GpuTempC, bool GameRunning, string? Bottleneck)
+{
+    public double RamUsedGb { get; init; }
+    public double RamTotalGb { get; init; }
+    public double CommitUsedGb { get; init; }
+    public double CommitLimitGb { get; init; }
+    /// <summary>Frametimes (ms) der letzten 10 Sekunden, für die Mini-Kurve auf höchstens 240 Punkte verdichtet.</summary>
+    public IReadOnlyList<double> RecentFrameTimes { get; init; } = [];
+    /// <summary>Ruckler in den letzten 10 Sekunden.</summary>
+    public int StuttersLast10s { get; init; }
+}
 
 /// <summary>
 /// Zeichnet Frame-Daten (PresentMon) und Systemsensoren parallel auf.
@@ -266,6 +276,8 @@ public sealed class PerformanceRecorder : IDisposable
         var frames = PerformanceAnalyzer.MainSwapChain(_rec.Frames);
         double? fps = null, ft = null, low = null;
         string? bottleneck = null;
+        List<double> recentFt = [];
+        int stutters = 0;
         if (frames.Count > 0)
         {
             double now = frames[^1].TimeMs;
@@ -283,9 +295,40 @@ public sealed class PerformanceRecorder : IDisposable
             }
             var last10s = frames.Where(f => f.TimeMs >= now - 10000).Select(f => f.FrameTimeMs).ToList();
             if (last10s.Count >= 20) low = 1000.0 / PerformanceAnalyzer.Percentile(last10s, 99);
+            recentFt = Downsample(last10s, 240);
+            if (last10s.Count >= 20)
+            {
+                // Gleiche Regel wie in der Auswertung: deutlich länger als der Median der Umgebung
+                double median = PerformanceAnalyzer.Percentile(last10s, 50);
+                stutters = last10s.Count(x => x > 2.0 * median && x > median + 12);
+            }
         }
         return new LiveStats(_clock.Elapsed, frames.Count, fps, ft, low, s.CpuTotalPct, s.CpuMaxCorePct,
-            s.GpuUtilPct, s.VramUsedMb, s.VramTotalMb, s.GpuTempC, s.GameRunning, bottleneck);
+            s.GpuUtilPct, s.VramUsedMb, s.VramTotalMb, s.GpuTempC, s.GameRunning, bottleneck)
+        {
+            RamUsedGb = s.RamUsedGb,
+            RamTotalGb = s.RamTotalGb,
+            CommitUsedGb = s.CommitUsedGb,
+            CommitLimitGb = s.CommitLimitGb,
+            RecentFrameTimes = recentFt,
+            StuttersLast10s = stutters,
+        };
+    }
+
+    /// <summary>Verdichtet auf höchstens <paramref name="max"/> Punkte; behält je Block den Höchstwert, damit Ruckler sichtbar bleiben.</summary>
+    private static List<double> Downsample(List<double> values, int max)
+    {
+        if (values.Count <= max) return values;
+        var result = new List<double>(max);
+        double step = values.Count / (double)max;
+        for (int i = 0; i < max; i++)
+        {
+            int a = (int)(i * step), b = Math.Min(values.Count, (int)((i + 1) * step));
+            double m = values[a];
+            for (int j = a + 1; j < b; j++) if (values[j] > m) m = values[j];
+            result.Add(m);
+        }
+        return result;
     }
 
     public void Dispose() => Stop();

@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using System.Windows;
 
 namespace GameDoctor.App;
@@ -28,11 +26,8 @@ public static class ThemeManager
     /// <summary>Wird nach jedem Wechsel ausgelöst (z. B. für selbst gezeichnete Diagramme).</summary>
     public static event Action? Changed;
 
-    private static string SettingsPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GameDoctor", "app-settings.json");
-
     /// <summary>Beim Start: gespeicherten Skin laden (oder den Standard).</summary>
-    public static void ApplySaved() => Apply(LoadSettings().Skin ?? DefaultSkinId, save: false);
+    public static void ApplySaved() => Apply(AppSettings.Load().Skin ?? DefaultSkinId, save: false);
 
     public static void Apply(string id, bool save = true)
     {
@@ -45,38 +40,7 @@ public static class ThemeManager
         else merged.Add(dict);
 
         Current = skin;
-        if (save)
-        {
-            var s = LoadSettings();
-            s.Skin = skin.Id;
-            SaveSettings(s);
-        }
+        if (save) AppSettings.Update(s => s.Skin = skin.Id);
         Changed?.Invoke();
-    }
-
-    private sealed class AppSettings
-    {
-        public string? Skin { get; set; }
-    }
-
-    private static AppSettings LoadSettings()
-    {
-        try
-        {
-            if (File.Exists(SettingsPath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath)) ?? new AppSettings();
-        }
-        catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { }
-        return new AppSettings();
-    }
-
-    private static void SaveSettings(AppSettings s)
-    {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(s, new JsonSerializerOptions { WriteIndented = true }));
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* Skin gilt trotzdem für diese Sitzung */ }
     }
 }

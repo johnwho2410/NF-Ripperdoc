@@ -195,6 +195,26 @@
                         <TextBlock Text="{Binding Hint}" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </DockPanel>
 
+                    <!-- Ingame-Overlay -->
+                    <local:ShapeBorder Style="{StaticResource Card}" Padding="18,12" Margin="0,0,0,16">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="{Binding OverlayButtonText}" Click="Overlay_Click" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                            <Border DockPanel.Dock="Right" Background="{DynamicResource Bg}" CornerRadius="{DynamicResource CornerS}" Padding="3" VerticalAlignment="Center"
+                                    ToolTip="Ecke des Bildschirms, in der das Overlay erscheint">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Style="{StaticResource Segment}" Content="↖" Tag="TopLeft" GroupName="corner" IsChecked="{Binding CornerTopLeft, Mode=OneWay}" Checked="OverlayCorner_Checked"/>
+                                    <RadioButton Style="{StaticResource Segment}" Content="↗" Tag="TopRight" GroupName="corner" IsChecked="{Binding CornerTopRight, Mode=OneWay}" Checked="OverlayCorner_Checked"/>
+                                    <RadioButton Style="{StaticResource Segment}" Content="↙" Tag="BottomLeft" GroupName="corner" IsChecked="{Binding CornerBottomLeft, Mode=OneWay}" Checked="OverlayCorner_Checked"/>
+                                    <RadioButton Style="{StaticResource Segment}" Content="↘" Tag="BottomRight" GroupName="corner" IsChecked="{Binding CornerBottomRight, Mode=OneWay}" Checked="OverlayCorner_Checked"/>
+                                </StackPanel>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Ingame-Overlay" FontWeight="SemiBold" FontSize="14" FontFamily="{DynamicResource HeadFont}"/>
+                                <TextBlock Text="{Binding OverlayHint}" Style="{StaticResource Muted}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </local:ShapeBorder>
+
                     <!-- Live-Werte -->
                     <ItemsControl ItemsSource="{Binding LiveTiles}" ItemTemplate="{StaticResource StatTileTemplate}"
                                   Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}}">

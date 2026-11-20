@@ -46,6 +46,8 @@
     <SolidColorBrush x:Key="RecommendText" Color="#B8F5D8"/>
     <SolidColorBrush x:Key="BusyOverlay" Color="#E00A0B0F"/>
     <SolidColorBrush x:Key="ChartLine" Color="{StaticResource CyanColor}"/>
+    <!-- Halbtransparenter Hintergrund des Ingame-Overlays -->
+    <SolidColorBrush x:Key="OverlayBg" Color="#D813151C"/>
     <SolidColorBrush x:Key="EdgeAccent" Color="{StaticResource AccentColor}"/>
 
     <!-- Formen: eckig mit abgeschrägten Ecken -->

@@ -32,6 +32,8 @@
     <SolidColorBrush x:Key="RecommendText" Color="#BFF0CF"/>
     <SolidColorBrush x:Key="BusyOverlay" Color="#D9111318"/>
     <SolidColorBrush x:Key="ChartLine" Color="{StaticResource AccentColor}"/>
+    <!-- Halbtransparenter Hintergrund des Ingame-Overlays -->
+    <SolidColorBrush x:Key="OverlayBg" Color="#D81A1D24"/>
     <!-- Farbige Kante an abgeschrägten Ecken: im neutralen Skin keine -->
     <SolidColorBrush x:Key="EdgeAccent" Color="Transparent"/>
 
