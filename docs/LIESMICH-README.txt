@@ -38,3 +38,7 @@ Important
   - The in-game overlay needs "Borderless windowed" mode. Toggle: Ctrl+Shift+O.
   - AI analysis uses your own account or a local model. Data is only sent when you click.
   - Settings and recordings are stored in %LOCALAPPDATA%\GameDoctor.
+
+Lizenz / License
+  Copyright (C) 2026 Noisefloor. Freie Software unter der GNU General Public License v3 (siehe LICENSE im Quellcode-Repository:
+  https://github.com/johnwho2410/NF-Ripperdoc). / Free software under the GNU General Public License v3.

@@ -30,3 +30,9 @@ dotnet run --project src/GameDoctor.App -c Release
 ## Status
 
 Early beta, Cyberpunk 2077 only. Unofficial fan-made tool, not affiliated with or endorsed by CD PROJEKT RED. Cyberpunk 2077 is a trademark of CD PROJEKT S.A. PresentMon is by Intel (MIT license).
+
+## License
+
+Copyright (C) 2026 Noisefloor
+
+This program is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License](LICENSE) as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the license for details.
