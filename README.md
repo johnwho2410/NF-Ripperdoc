@@ -1,72 +1,32 @@
-# GameDoctor
+# NF-RIPPERDOC (GameDoctor)
 
-Absturz- und Performance-Analyse für Cyberpunk 2077 (später weitere Spiele).
+**Cyberpunk 2077 mod diagnostics – beta.** A standalone Windows app that reads your game's crash reports, points to suspect mods, checks your mod setup, measures FPS and bottlenecks, and suggests concrete next steps. It never changes your mods or game files.
 
-## Stand
+*Deutsch: siehe [docs/LIESMICH-README.txt](docs/LIESMICH-README.txt).*
 
-**Absturzanalyse (Kommandozeile)** – fertig als erste Version:
+## Features
 
-- liest alle Crashreports des Spiels (`%LOCALAPPDATA%\REDEngine\ReportQueue`)
-- wertet die Minidumps selbst aus: abstürzendes Modul, Fehlerart, Mods auf dem Stack
-- erkennt Muster über alle Abstürze (gleiche Absturzstelle, verdächtige Mods)
-- liest Mod-Logs: redscript, RED4ext, Cyber Engine Tweaks, ArchiveXL, TweakXL, Codeware
-- prüft die Windows-Ereignisanzeige (Treiber-Timeouts, Hardwarefehler, Neustarts)
-- prüft das System (RAM, freier Speicher, SSD/HDD)
+- **Crash analysis:** parses the game's crash dumps with its own parser; shows crash site, error type, time until crash, VRAM, GPU and driver; finds mods on the crashing thread's stack (a hint, not proof); detects patterns across crashes
+- **Mod logs:** reads RED4ext, Cyber Engine Tweaks, redscript, ArchiveXL, TweakXL and Codeware logs; checks the Windows event log, RAM, disk space and page file
+- **Try a fix:** pick a suspect, make the change yourself (Vortex, Mod Organizer 2 or manually), and GameDoctor watches whether the crash site comes back
+- **Performance:** frame data via Intel's open-source [PresentMon](https://github.com/GameTechDev/PresentMon) (downloaded only after you confirm), GPU/CPU sensors, 1% / 0.1% lows, stutters, GPU-/CPU-bound analysis, optional in-game overlay (Ctrl+Shift+O, borderless windowed mode)
+- **Mods & system overview:** installed mods with version and Nexus ID, data sources and what is missing; detects Steam, GOG, Epic and Xbox Game Pass installs and Vortex, Mod Organizer 2 and REDmod
+- **Optional AI analysis:** an anonymized summary for ChatGPT, Claude, Gemini and others, or analysis inside the app with your own account or a local model – only when you click the button
+- English and German interface (follows Windows, switchable), several skins
 
-**Performance-Analyse** – erste Version:
+## Privacy
 
-- Frame-Daten über PresentMon (Intel, Open Source; wird nach Zustimmung heruntergeladen, SHA-256-geprüft)
-- Sensoren: CPU je Kern, GPU-Last/VRAM/Temperatur/Takt/Drosselung über NVML (NVIDIA), RAM und Auslagerung
-- Auswertung: Ø FPS, 1 %/0,1 % Low, Ruckler, CPU- vs. GPU-Limit, VRAM-/RAM-Engpässe, thermische Drosselung
-- Empfehlungen auf Basis der echten Spieleinstellungen (`UserSettings.json`)
-- Kommandozeile: `gamedoctor perf [--seconds 60]`
+No telemetry, no account. Analysis runs on your PC. The only network use is the PresentMon download (after confirmation, SHA-256-verified) and the optional AI analysis. Settings and recordings are stored in `%LOCALAPPDATA%\GameDoctor`. See [docs/DATENSCHUTZ-COMMUNITY.md](docs/DATENSCHUTZ-COMMUNITY.md) (German) for the concept of the planned, anonymous community database; nothing of it is sent yet.
 
-**KI-Prompt-Generator:** fasst alle Befunde (System, Abstürze, Muster, Mod-Logs, Mod-Liste, Performance) als
-anonymisierten Text für ChatGPT, Claude, Gemini o. ä. zusammen. App: „KI-Prompt“ bzw. „KI-Prompt für diesen Absturz“,
-Kommandozeile: `gamedoctor prompt [--out prompt.txt]`.
+## Build from source
 
-**Datenquellen:** GameDoctor durchsucht den PC nicht, sondern prüft bekannte Fundorte:
-
-| Quelle | Erkennung |
-|---|---|
-| Spielordner | festgelegt → laufendes Spiel → Steam (alle Bibliotheken) / GOG / Epic / Xbox-Game-Pass → zuletzt gefunden |
-| Mod-Liste | Vortex (`vortex.deployment.json`), Mod Organizer 2 (Instanz, `modlist.txt`, `meta.ini`), REDmod (`mods\`) |
-| Mod-Logs | Spielordner und – bei MO2 – aktive Mod-Ordner und `overwrite` |
-| Crashreports, Einstellungen | `%LOCALAPPDATA%\REDEngine\ReportQueue`, `%LOCALAPPDATA%\CD Projekt Red\Cyberpunk 2077` |
-
-Im Tab „Mods & System“ zeigt die Übersicht „Datenquellen“, was gefunden wurde und was fehlt; dort lassen sich
-Spielordner und MO2-Instanz festlegen oder (auf Klick) die Laufwerke durchsuchen. Kommandozeile:
-`gamedoctor sources [--set-game <Ordner>] [--set-mo2 <Instanz>] [--clear] [--search]`.
-
-## Benutzung
-
-Oberfläche (Übersicht, Absturzliste mit Details, Mods & System):
+Requires Windows 10/11 and the .NET 10 SDK. See [docs/BUILDING.md](docs/BUILDING.md).
 
 ```powershell
-dotnet run -c Release --project src\GameDoctor.App
+dotnet build GameDoctor.slnx -c Release
+dotnet run --project src/GameDoctor.App -c Release
 ```
 
-Kommandozeile:
+## Status
 
-```powershell
-dotnet run -c Release --project src\GameDoctor.Cli
-```
-
-Optionen: `--game <Spielordner>`, `--days 30`, `--details 5`, `--out bericht.md`, `--dump <datei.dmp>` (technische Detailansicht).
-
-## Aufbau
-
-| Ordner | Inhalt |
-|---|---|
-| `src/GameDoctor.Core/Dump` | eigener Minidump-Leser |
-| `src/GameDoctor.Core/Games/Cyberpunk` | Spielordner finden, Crashreports und Mod-Logs lesen |
-| `src/GameDoctor.Core/Platform` | Windows-Ereignisanzeige |
-| `src/GameDoctor.Core/Analysis` | Modul-Einordnung und Diagnoseregeln |
-| `src/GameDoctor.Core/Report` | Markdown-Bericht |
-| `src/GameDoctor.Cli` | Kommandozeilenprogramm |
-| `src/GameDoctor.App` | WPF-Oberfläche |
-
-## Nächste Schritte
-
-1. Overlay
-2. Sensoren für AMD/Intel-GPUs und CPU-Temperatur
+Early beta, Cyberpunk 2077 only. Unofficial fan-made tool, not affiliated with or endorsed by CD PROJEKT RED. Cyberpunk 2077 is a trademark of CD PROJEKT S.A. PresentMon is by Intel (MIT license).
