@@ -135,6 +135,28 @@ public sealed class PerformanceViewModel : ObservableObject
     }
 }
 
+/// <summary>Eine Zeile der Ansicht „Datenquellen“.</summary>
+public sealed class DataSourceViewModel(GameDoctor.Core.Platform.DataSource d)
+{
+    public string Name => d.Name;
+    public string Detail => d.Detail;
+    public string? Hint => d.Hint;
+    public string Icon => d.Status switch
+    {
+        GameDoctor.Core.Platform.DataSourceStatus.Ok => "✔",
+        GameDoctor.Core.Platform.DataSourceStatus.Partial => "◐",
+        GameDoctor.Core.Platform.DataSourceStatus.Missing => "✘",
+        _ => "ℹ",
+    };
+    public Brush Brush => d.Status switch
+    {
+        GameDoctor.Core.Platform.DataSourceStatus.Ok => SeverityBrushConverter.Good,
+        GameDoctor.Core.Platform.DataSourceStatus.Partial => SeverityBrushConverter.For(Severity.Warning),
+        GameDoctor.Core.Platform.DataSourceStatus.Missing => SeverityBrushConverter.For(Severity.Critical),
+        _ => SeverityBrushConverter.For(Severity.Info),
+    };
+}
+
 /// <summary>Ein Lösungsversuch samt automatischer Bewertung – für den Tab „Lösungen“.</summary>
 public sealed class FixAttemptViewModel
 {
@@ -237,10 +259,17 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<Finding> PatternFindings { get; } = [];
     public ObservableCollection<Finding> EnvironmentFindings { get; } = [];
     public ObservableCollection<CrashViewModel> Crashes { get; } = [];
+    public ObservableCollection<DataSourceViewModel> DataSources { get; } = [];
+
+    private bool _gameMissing;
+    public bool GameMissing { get => _gameMissing; set => Set(ref _gameMissing, value); }
 
     public void Load(AnalysisResult r)
     {
         Result = r;
+        GameMissing = r.Install is null;
+        DataSources.Clear();
+        foreach (var d in r.DataSources) DataSources.Add(new DataSourceViewModel(d));
         GameInfo = r.Install is null
             ? "Cyberpunk 2077 nicht gefunden"
             : $"Cyberpunk 2077  ·  Version {r.GameVersion ?? "?"}  ·  {r.Install.Store}  ·  {r.Install.Root}";

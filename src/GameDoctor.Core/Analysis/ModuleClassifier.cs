@@ -14,11 +14,27 @@ public sealed class ModuleClassifier
     private readonly Dictionary<string, uint?> _imageSizeCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string, uint), string> _resolved = new();
 
-    public ModuleClassifier(string? gameRoot)
+    private readonly List<string> _roots = [];
+
+    /// <param name="gameRoot">Spielordner.</param>
+    /// <param name="extraRoots">Weitere Ebenen mit Spielordner-Struktur (Mod Organizer 2: aktive Mods + overwrite).</param>
+    public ModuleClassifier(string? gameRoot, IReadOnlyList<string>? extraRoots = null)
     {
         _gameRoot = gameRoot is null ? null : gameRoot.TrimEnd('\\') + "\\";
-        if (gameRoot is not null) IndexGameFiles(gameRoot);
+        if (gameRoot is not null)
+        {
+            _roots.Add(_gameRoot!.ToLowerInvariant());
+            IndexGameFiles(gameRoot);
+        }
+        foreach (var r in extraRoots ?? [])
+        {
+            _roots.Add(r.TrimEnd('\\').ToLowerInvariant() + "\\");
+            IndexGameFiles(r);
+        }
     }
+
+    /// <summary>Liegt der Pfad im Spielordner oder in einer zusätzlichen Ebene?</summary>
+    private bool UnderAnyRoot(string fullLower) => _roots.Any(r => fullLower.StartsWith(r, StringComparison.Ordinal));
 
     private void IndexGameFiles(string root)
     {
@@ -145,7 +161,7 @@ public sealed class ModuleClassifier
         if (GpuDriverPrefixes.Any(p => name.StartsWith(p, StringComparison.Ordinal))) return ModuleKind.GpuDriver;
         if (full.Contains(@"\driverstore\filerepository\")) return ModuleKind.GpuDriver;
 
-        if (_gameRoot is not null && full.StartsWith(_gameRoot.ToLowerInvariant(), StringComparison.Ordinal))
+        if (UnderAnyRoot(full))
         {
             if (ModFrameworkNames.Any(n => name.StartsWith(n, StringComparison.Ordinal))) return ModuleKind.ModFramework;
             if (full.Contains(@"\red4ext\plugins\") || full.Contains(@"\cyber_engine_tweaks\") || name.EndsWith(".asi"))
@@ -185,7 +201,7 @@ public sealed class ModuleClassifier
             return folder.Equals(module.Name, StringComparison.OrdinalIgnoreCase) ? folder : $"{folder} ({module.Name})";
         }
         var name = module.Name.ToLowerInvariant();
-        if (_gameRoot is not null && p.StartsWith(_gameRoot, StringComparison.OrdinalIgnoreCase))
+        if (UnderAnyRoot(p.ToLowerInvariant()))
         {
             if (name == "version.dll") return "Ultimate ASI Loader (version.dll, lädt CET)";
             if (name == "winmm.dll") return "RED4ext-Loader (winmm.dll)";

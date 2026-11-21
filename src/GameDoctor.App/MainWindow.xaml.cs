@@ -79,6 +79,103 @@ public partial class MainWindow : Window
         FixPage.Visibility = Tabs.SelectedIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    // ------------------------------------------------------------------ Datenquellen
+
+    private async void SetGameFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFolderDialog { Title = "Cyberpunk-2077-Spielordner auswählen (der Ordner, in dem „bin“ und „archive“ liegen)" };
+        if (dlg.ShowDialog(this) != true) return;
+
+        var folder = NormalizeGameFolder(dlg.FolderName);
+        if (folder is null)
+        {
+            MessageBox.Show(this, $"In „{dlg.FolderName}“ wurde kein Cyberpunk 2077 gefunden (bin\\x64\\Cyberpunk2077.exe fehlt).\n\n" +
+                "Bitte den Hauptordner des Spiels wählen – bei Steam z. B. …\\steamapps\\common\\Cyberpunk 2077.",
+                "Kein Spielordner", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var ps = GameDoctor.Core.Platform.PathSettings.Load();
+        ps.GamePath = folder;
+        ps.Save();
+        await RunAnalysisAsync();
+    }
+
+    /// <summary>Nimmt auch versehentlich gewählte Unterordner an (bin oder bin\x64).</summary>
+    private static string? NormalizeGameFolder(string folder)
+    {
+        for (var dir = folder; dir is not null; dir = Path.GetDirectoryName(dir))
+        {
+            if (CyberpunkInstall.IsGameFolder(dir)) return dir;
+            if (dir.Length <= 3) break;
+            if (!folder.StartsWith(dir, StringComparison.OrdinalIgnoreCase) || folder.Length - dir.Length > 12) break;
+        }
+        return null;
+    }
+
+    private async void SetMo2_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFolderDialog { Title = "Mod-Organizer-2-Instanz auswählen (Ordner mit ModOrganizer.ini)" };
+        if (dlg.ShowDialog(this) != true) return;
+        if (!File.Exists(Path.Combine(dlg.FolderName, "ModOrganizer.ini")))
+        {
+            MessageBox.Show(this, "In diesem Ordner liegt keine ModOrganizer.ini.\n\nBei einer portablen Installation ist das der Ordner von ModOrganizer.exe, " +
+                "sonst %LOCALAPPDATA%\\ModOrganizer\\<Instanzname>.", "Keine MO2-Instanz", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var ps = GameDoctor.Core.Platform.PathSettings.Load();
+        ps.Mo2InstancePath = dlg.FolderName;
+        ps.Save();
+        await RunAnalysisAsync();
+    }
+
+    private async void ResetPaths_Click(object sender, RoutedEventArgs e)
+    {
+        var ps = GameDoctor.Core.Platform.PathSettings.Load();
+        ps.GamePath = null;
+        ps.Mo2InstancePath = null;
+        ps.Save();
+        await RunAnalysisAsync();
+    }
+
+    private async void SearchGame_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this,
+                "GameDoctor durchsucht jetzt die lokalen Laufwerke nach Cyberpunk 2077 (höchstens 60 Sekunden).\n\n" +
+                "Dabei werden nur Ordnernamen geprüft – keine Dateien geöffnet, nichts übertragen. Windows- und Systemordner werden übersprungen.",
+                "Nach dem Spiel suchen", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
+
+        _vm.IsBusy = true;
+        List<string> hits;
+        try
+        {
+            var progress = new Progress<string>(d => _vm.Status = "Durchsuche " + d);
+            hits = await Task.Run(() => CyberpunkInstall.SearchDrives(TimeSpan.FromSeconds(60), default, ((IProgress<string>)progress).Report));
+        }
+        finally
+        {
+            _vm.IsBusy = false;
+        }
+
+        if (hits.Count == 0)
+        {
+            _vm.Status = "Keine Cyberpunk-Installation gefunden.";
+            MessageBox.Show(this, "Keine Installation gefunden. Bitte den Spielordner manuell festlegen.", "Nichts gefunden", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        foreach (var hit in hits)
+        {
+            var answer = MessageBox.Show(this, $"Gefunden:\n{hit}\n\nDiesen Ordner verwenden?", "Cyberpunk gefunden",
+                hits.Count > 1 ? MessageBoxButton.YesNoCancel : MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (answer == MessageBoxResult.Cancel) return;
+            if (answer != MessageBoxResult.Yes) continue;
+            var ps = GameDoctor.Core.Platform.PathSettings.Load();
+            ps.GamePath = hit;
+            ps.Save();
+            await RunAnalysisAsync();
+            return;
+        }
+    }
+
     // ------------------------------------------------------------------ Lösungsversuche
 
     private ModInventory _inventory = new();
@@ -88,11 +185,11 @@ public partial class MainWindow : Window
     {
         var vms = await Task.Run(() =>
         {
-            _inventory = result.Install is null ? new ModInventory() : ModInventory.Load(result.Install.Root);
+            _inventory = result.Inventory;
             var ledger = PlaySessionLedger.Load();
             ledger.Harvest(result.Install, result.Crashes);
             try { ledger.Save(); } catch { /* nicht kritisch */ }
-            var evaluator = new FixEvaluator(result.Crashes, ledger, result.Install);
+            var evaluator = new FixEvaluator(result.Crashes, ledger, result.Install, result.Inventory.ExtraRoots);
             return FixAttemptStore.Load().Select(a => new FixAttemptViewModel(a, evaluator.Evaluate(a))).ToList();
         });
         _vm.SetFixes(vms);
@@ -101,7 +198,7 @@ public partial class MainWindow : Window
     private async void NewFix_Click(object sender, RoutedEventArgs e)
     {
         if (_vm.Result is not { } result || _vm.SelectedCrash?.Case is not { } crash) return;
-        var dlg = new FixAttemptWindow(crash, result, _inventory, new ModuleClassifier(result.Install?.Root)) { Owner = this };
+        var dlg = new FixAttemptWindow(crash, result, _inventory, result.Classifier) { Owner = this };
         if (dlg.ShowDialog() != true || dlg.Created is null) return;
         FixAttemptStore.Upsert(dlg.Created);
         await RefreshFixesAsync(result);

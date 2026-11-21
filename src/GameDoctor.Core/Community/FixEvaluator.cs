@@ -60,11 +60,12 @@ public sealed class FixEvaluator
     private readonly PlaySessionLedger _ledger;
     private readonly HashSet<string>? _installedFiles;
 
-    public FixEvaluator(IReadOnlyList<CrashCase> crashes, PlaySessionLedger ledger, CyberpunkInstall? install)
+    /// <param name="extraRoots">Aktive virtuelle Mod-Ordner (Mod Organizer 2) – dort liegen Mods statt im Spielordner.</param>
+    public FixEvaluator(IReadOnlyList<CrashCase> crashes, PlaySessionLedger ledger, CyberpunkInstall? install, IReadOnlyList<string>? extraRoots = null)
     {
         _crashes = crashes;
         _ledger = ledger;
-        _installedFiles = install is null ? null : IndexModFiles(install);
+        _installedFiles = install is null ? null : IndexModFiles(install, extraRoots ?? []);
     }
 
     public FixEvaluation Evaluate(FixAttempt a)
@@ -157,7 +158,7 @@ public sealed class FixEvaluator
     private static string Hours(TimeSpan t) =>
         t.TotalMinutes < 90 ? $"{Math.Max(0, t.TotalMinutes):F0} Min." : $"{t.TotalHours:F1} Std.";
 
-    private static HashSet<string> IndexModFiles(CyberpunkInstall install)
+    private static HashSet<string> IndexModFiles(CyberpunkInstall install, IReadOnlyList<string> extraRoots)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         void Add(string dir, SearchOption opt)
@@ -172,6 +173,8 @@ public sealed class FixEvaluator
         Add(install.ArchiveModDir, SearchOption.AllDirectories);
         Add(install.RedscriptDir, SearchOption.AllDirectories);
         Add(Path.Combine(install.Root, "r6", "tweaks"), SearchOption.AllDirectories);
+        // Mod Organizer 2: aktive Mods liegen in eigenen Ordnern (deaktivierte sind dort nicht enthalten)
+        foreach (var root in extraRoots) Add(root, SearchOption.AllDirectories);
         return set;
     }
 }

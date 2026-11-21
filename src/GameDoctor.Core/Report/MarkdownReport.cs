@@ -80,6 +80,23 @@ public static class MarkdownReport
         foreach (var c in r.Crashes)
             sb.AppendLine($"| {c.Report.Time:dd.MM. HH:mm} | {ModuleClassifier.KindLabel(c.FaultKind)}: {c.FaultLabel} | `{c.Signature}` | {(c.Report.UptimeSeconds is int u ? TimeSpan.FromSeconds(u).ToString(@"h\:mm\:ss") : "?")} |");
         sb.AppendLine();
+
+        sb.AppendLine("## Datenquellen");
+        sb.AppendLine();
+        sb.AppendLine("| | Quelle | Stand |");
+        sb.AppendLine("|---|---|---|");
+        foreach (var d in r.DataSources)
+        {
+            var mark = d.Status switch
+            {
+                Platform.DataSourceStatus.Ok => "✔",
+                Platform.DataSourceStatus.Partial => "◐",
+                Platform.DataSourceStatus.Missing => "✘",
+                _ => "ℹ",
+            };
+            sb.AppendLine($"| {mark} | {d.Name} | {d.Detail.Replace("|", "\\|")}{(d.Hint is not null ? $" – *{d.Hint}*" : "")} |");
+        }
+        sb.AppendLine();
         sb.AppendLine("---");
         sb.AppendLine("*Hinweis: „Mods auf dem Stack“ ist eine Heuristik. Sie liefert starke Indizien, aber keinen Beweis.*");
         return sb.ToString();

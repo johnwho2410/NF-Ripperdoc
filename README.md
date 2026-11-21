@@ -25,6 +25,19 @@ Absturz- und Performance-Analyse für Cyberpunk 2077 (später weitere Spiele).
 anonymisierten Text für ChatGPT, Claude, Gemini o. ä. zusammen. App: „KI-Prompt“ bzw. „KI-Prompt für diesen Absturz“,
 Kommandozeile: `gamedoctor prompt [--out prompt.txt]`.
 
+**Datenquellen:** GameDoctor durchsucht den PC nicht, sondern prüft bekannte Fundorte:
+
+| Quelle | Erkennung |
+|---|---|
+| Spielordner | festgelegt → laufendes Spiel → Steam (alle Bibliotheken) / GOG / Epic / Xbox-Game-Pass → zuletzt gefunden |
+| Mod-Liste | Vortex (`vortex.deployment.json`), Mod Organizer 2 (Instanz, `modlist.txt`, `meta.ini`), REDmod (`mods\`) |
+| Mod-Logs | Spielordner und – bei MO2 – aktive Mod-Ordner und `overwrite` |
+| Crashreports, Einstellungen | `%LOCALAPPDATA%\REDEngine\ReportQueue`, `%LOCALAPPDATA%\CD Projekt Red\Cyberpunk 2077` |
+
+Im Tab „Mods & System“ zeigt die Übersicht „Datenquellen“, was gefunden wurde und was fehlt; dort lassen sich
+Spielordner und MO2-Instanz festlegen oder (auf Klick) die Laufwerke durchsuchen. Kommandozeile:
+`gamedoctor sources [--set-game <Ordner>] [--set-mo2 <Instanz>] [--clear] [--search]`.
+
 ## Benutzung
 
 Oberfläche (Übersicht, Absturzliste mit Details, Mods & System):

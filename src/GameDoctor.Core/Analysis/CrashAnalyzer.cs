@@ -26,6 +26,14 @@ public sealed class AnalysisResult
     public List<Finding> EnvironmentFindings { get; } = [];
     public ModLogScanner.Result? ModLogs { get; set; }
     public List<SystemEvent> SystemEvents { get; set; } = [];
+    /// <summary>Installierte Mods laut Mod-Manager (Vortex, Mod Organizer 2) und REDmod.</summary>
+    public Community.ModInventory Inventory { get; set; } = new();
+    /// <summary>Modul-Einordnung inkl. virtueller Mod-Ordner – zur Wiederverwendung (App, CLI).</summary>
+    public ModuleClassifier Classifier { get; set; } = new(null);
+    /// <summary>Welche Fundorte für das Spiel geprüft wurden.</summary>
+    public List<LocateProbe> LocateProbes { get; set; } = [];
+    /// <summary>Welche Datenquellen gefunden wurden und welche fehlen.</summary>
+    public List<DataSource> DataSources { get; set; } = [];
 }
 
 public sealed class CrashAnalyzerOptions
@@ -41,9 +49,22 @@ public static class CrashAnalyzer
 {
     public static AnalysisResult Run(CrashAnalyzerOptions options, Action<string>? progress = null)
     {
-        var install = options.GamePath is not null ? CyberpunkInstall.FromPath(options.GamePath) : CyberpunkInstall.Locate();
-        var result = new AnalysisResult { Install = install, GameVersion = install?.GameVersion };
-        var classifier = new ModuleClassifier(install?.Root);
+        progress?.Invoke("Suche Spiel und Mod-Manager …");
+        var paths = PathSettings.Load();
+        var probes = new List<LocateProbe>();
+        var install = options.GamePath is not null
+            ? CyberpunkInstall.FromPath(options.GamePath, "Festgelegt (Kommandozeile)")
+            : CyberpunkInstall.Locate(paths, out probes);
+        var inventory = install is null ? new Community.ModInventory() : Community.ModInventory.Detect(install, paths);
+        var classifier = new ModuleClassifier(install?.Root, inventory.ExtraRoots);
+        var result = new AnalysisResult
+        {
+            Install = install,
+            GameVersion = install?.GameVersion,
+            Inventory = inventory,
+            Classifier = classifier,
+            LocateProbes = probes,
+        };
         var since = DateTime.Now.AddDays(-options.Days);
 
         progress?.Invoke("Lese Windows-Ereignisanzeige …");
@@ -64,11 +85,12 @@ public static class CrashAnalyzer
         if (install is not null)
         {
             progress?.Invoke("Lese Mod-Logs …");
-            result.ModLogs = new ModLogScanner(install).Scan();
+            result.ModLogs = new ModLogScanner(install, inventory.ExtraRoots).Scan();
         }
 
         ApplyPatternRules(result);
         ApplyEnvironmentRules(result, install);
+        result.DataSources = DataSourceReport.Build(result);
         return result;
     }
 

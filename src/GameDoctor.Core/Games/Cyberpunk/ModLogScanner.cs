@@ -7,9 +7,34 @@ public sealed record LogIssue(string Source, Severity Severity, string Message, 
 /// <summary>Inhalte einer Mod (Orte, Kartenmarkierungen, Journal-Einträge), die das Spiel nicht findet.</summary>
 public sealed record UnresolvedModContent(string Source, string Owner, IReadOnlyList<string> Items, string File);
 
-/// <summary>Liest die Logs der gängigen Mod-Frameworks (redscript, RED4ext, CET, ArchiveXL, TweakXL) aus.</summary>
-public sealed class ModLogScanner(CyberpunkInstall install)
+/// <summary>
+/// Liest die Logs der gängigen Mod-Frameworks (redscript, RED4ext, CET, ArchiveXL, TweakXL) aus.
+/// Sucht im Spielordner und in zusätzlichen Ebenen (Mod Organizer 2: aktive Mods + overwrite), weil Logs dort landen,
+/// wenn das Spiel über MO2 gestartet wird.
+/// </summary>
+public sealed class ModLogScanner(CyberpunkInstall install, IReadOnlyList<string>? extraRoots = null)
 {
+    private IEnumerable<string> Roots => new[] { install.Root }.Concat(extraRoots ?? []);
+
+    /// <summary>Denselben relativen Pfad in allen Ebenen.</summary>
+    private IEnumerable<string> InAllRoots(params string[] relative) =>
+        Roots.Select(r => Path.Combine([r, .. relative]));
+
+    /// <summary>Neueste nicht-leere Datei mit diesem Muster in diesem relativen Ordner – über alle Ebenen.</summary>
+    private string? NewestAcross(string pattern, params string[] relativeDir) =>
+        InAllRoots(relativeDir).Select(d => Newest(d, pattern)).OfType<string>()
+            .OrderByDescending(File.GetLastWriteTime).FirstOrDefault();
+
+    /// <summary>Neueste vorhandene Datei unter diesem relativen Pfad – über alle Ebenen.</summary>
+    private string? FileAcross(params string[] relative) =>
+        InAllRoots(relative).Where(File.Exists).OrderByDescending(File.GetLastWriteTime).FirstOrDefault();
+
+    /// <summary>Unterordner dieses relativen Ordners über alle Ebenen, ohne doppelte Namen.</summary>
+    private int CountDirsAcross(params string[] relative) =>
+        InAllRoots(relative).Where(Directory.Exists)
+            .SelectMany(d => Directory.EnumerateDirectories(d).Select(Path.GetFileName))
+            .Where(n => n is not null && !n.StartsWith("__")).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+
     public sealed class Result
     {
         public List<LogIssue> Issues { get; } = [];
@@ -34,24 +59,22 @@ public sealed class ModLogScanner(CyberpunkInstall install)
     {
         var r = new Result
         {
-            Red4ExtPluginCount = CountDirs(Path.Combine(install.Red4ExtDir, "plugins")),
-            ArchiveModCount = Directory.Exists(install.ArchiveModDir)
-                ? Directory.EnumerateFiles(install.ArchiveModDir, "*.archive", SearchOption.AllDirectories).Count() : 0,
-            RedscriptModCount = CountDirs(install.RedscriptDir),
-            CetModCount = CountDirs(Path.Combine(install.CetDir, "mods")),
+            Red4ExtPluginCount = CountDirsAcross("red4ext", "plugins"),
+            ArchiveModCount = InAllRoots("archive", "pc", "mod").Where(Directory.Exists)
+                .SelectMany(d => Directory.EnumerateFiles(d, "*.archive", SearchOption.AllDirectories).Select(Path.GetFileName))
+                .Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            RedscriptModCount = CountDirsAcross("r6", "scripts"),
+            CetModCount = CountDirsAcross("bin", "x64", "plugins", "cyber_engine_tweaks", "mods"),
         };
 
         ScanRedscript(r);
         ScanRed4Ext(r);
         ScanCet(r);
-        ScanBracketLog(r, "ArchiveXL", Newest(Path.Combine(install.Red4ExtDir, "plugins", "ArchiveXL"), "ArchiveXL-*.log"));
-        ScanBracketLog(r, "TweakXL", Newest(Path.Combine(install.Red4ExtDir, "plugins", "TweakXL"), "TweakXL-*.log"));
-        ScanBracketLog(r, "Codeware", Newest(Path.Combine(install.Red4ExtDir, "plugins", "Codeware"), "Codeware-*.log"));
+        ScanBracketLog(r, "ArchiveXL", NewestAcross("ArchiveXL-*.log", "red4ext", "plugins", "ArchiveXL"));
+        ScanBracketLog(r, "TweakXL", NewestAcross("TweakXL-*.log", "red4ext", "plugins", "TweakXL"));
+        ScanBracketLog(r, "Codeware", NewestAcross("Codeware-*.log", "red4ext", "plugins", "Codeware"));
         return r;
     }
-
-    private static int CountDirs(string dir) =>
-        Directory.Exists(dir) ? Directory.EnumerateDirectories(dir).Count(d => !Path.GetFileName(d).StartsWith("__")) : 0;
 
     private static string? Newest(string dir, string pattern) =>
         Directory.Exists(dir)
@@ -74,8 +97,8 @@ public sealed class ModLogScanner(CyberpunkInstall install)
 
     private void ScanRedscript(Result r)
     {
-        var file = Path.Combine(install.RedscriptLogDir, "redscript_rCURRENT.log");
-        if (!File.Exists(file)) return;
+        var file = FileAcross("r6", "logs", "redscript_rCURRENT.log");
+        if (file is null) return;
         r.ScannedFiles.Add(file);
 
         var entries = new List<(string Level, List<string> Lines)>();
@@ -108,7 +131,7 @@ public sealed class ModLogScanner(CyberpunkInstall install)
 
     private void ScanRed4Ext(Result r)
     {
-        var file = Newest(Path.Combine(install.Red4ExtDir, "logs"), "red4ext-*.log");
+        var file = NewestAcross("red4ext-*.log", "red4ext", "logs");
         if (file is null) return;
         r.ScannedFiles.Add(file);
 
@@ -146,8 +169,8 @@ public sealed class ModLogScanner(CyberpunkInstall install)
 
     private void ScanCet(Result r)
     {
-        var mainLog = Path.Combine(install.CetDir, "cyber_engine_tweaks.log");
-        if (File.Exists(mainLog))
+        var mainLog = FileAcross("bin", "x64", "plugins", "cyber_engine_tweaks", "cyber_engine_tweaks.log");
+        if (mainLog is not null)
         {
             r.ScannedFiles.Add(mainLog);
             // Das Log wird über mehrere Sitzungen fortgeschrieben – nur die letzte Sitzung betrachten
@@ -164,8 +187,8 @@ public sealed class ModLogScanner(CyberpunkInstall install)
             AddCetIssues(r, session, mainLog, "CET");
         }
 
-        var scripting = Path.Combine(install.CetDir, "scripting.log");
-        if (File.Exists(scripting))
+        var scripting = FileAcross("bin", "x64", "plugins", "cyber_engine_tweaks", "scripting.log");
+        if (scripting is not null)
         {
             r.ScannedFiles.Add(scripting);
             AddCetIssues(r, SafeReadLines(scripting).TakeLast(20000), scripting, "CET-Lua");

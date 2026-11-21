@@ -61,6 +61,15 @@ public static class AiPromptBuilder
         }
         sb.AppendLine();
 
+        // ---------------- Datenquellen – damit die KI weiß, was fehlt, statt aus fehlenden Daten falsche Schlüsse zu ziehen
+        var gaps = r.DataSources.Where(d => d.Status is DataSourceStatus.Missing or DataSourceStatus.Partial).ToList();
+        sb.AppendLine("## Datenquellen");
+        sb.AppendLine($"- Mod-Manager: {r.Inventory.Manager ?? "keiner erkannt"}{(r.Inventory.ExtraRoots.Count > 0 ? " (Mods liegen in virtuellen Ordnern)" : "")}");
+        if (gaps.Count == 0) sb.AppendLine("- Alle Datenquellen vorhanden.");
+        foreach (var d in gaps)
+            sb.AppendLine($"- FEHLT/UNVOLLSTÄNDIG: {d.Name} – {d.Detail}");
+        sb.AppendLine();
+
         // ---------------- Fokus-Absturz
         var focus = o.FocusCrash ?? latest;
         if (focus is not null)

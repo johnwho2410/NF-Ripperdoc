@@ -11,6 +11,52 @@ if (args.Length > 0 && args[0] == "perf")
     return;
 }
 
+// Datenquellen: gamedoctor sources [--set-game <Ordner>] [--set-mo2 <Instanz>] [--clear] [--search]
+if (args.Length > 0 && args[0] == "sources")
+{
+    var ps = GameDoctor.Core.Platform.PathSettings.Load();
+    for (int i = 1; i < args.Length; i++)
+    {
+        switch (args[i])
+        {
+            case "--set-game":
+                var g = args[++i];
+                if (!GameDoctor.Core.Games.Cyberpunk.CyberpunkInstall.IsGameFolder(g)) { Console.WriteLine($"Kein Cyberpunk-Spielordner: {g} (bin\\x64\\Cyberpunk2077.exe fehlt)"); return; }
+                ps.GamePath = g; ps.Save(); Console.WriteLine("Spielordner festgelegt."); break;
+            case "--set-mo2":
+                var m = args[++i];
+                if (!File.Exists(Path.Combine(m, "ModOrganizer.ini"))) { Console.WriteLine($"Keine MO2-Instanz: {m} (ModOrganizer.ini fehlt)"); return; }
+                ps.Mo2InstancePath = m; ps.Save(); Console.WriteLine("MO2-Instanz festgelegt."); break;
+            case "--clear":
+                ps.GamePath = null; ps.Mo2InstancePath = null; ps.Save(); Console.WriteLine("Festgelegte Pfade entfernt – automatische Erkennung aktiv."); break;
+            case "--search":
+                Console.WriteLine("Durchsuche lokale Laufwerke (max. 60 s) …");
+                foreach (var hit in GameDoctor.Core.Games.Cyberpunk.CyberpunkInstall.SearchDrives(TimeSpan.FromSeconds(60)))
+                    Console.WriteLine("  gefunden: " + hit);
+                return;
+        }
+    }
+    var sr = CrashAnalyzer.Run(new CrashAnalyzerOptions { Days = 30 });
+    Console.WriteLine("Geprüfte Fundorte für das Spiel:");
+    foreach (var p in sr.LocateProbes)
+        Console.WriteLine($"  {(p.Found ? "✔" : "·")} {p.Source,-18} {p.Path ?? ""} {(p.Note is not null && !p.Found ? "– " + p.Note : "")}");
+    Console.WriteLine();
+    Console.WriteLine("Datenquellen:");
+    foreach (var d in sr.DataSources)
+    {
+        var mark = d.Status switch
+        {
+            GameDoctor.Core.Platform.DataSourceStatus.Ok => "✔",
+            GameDoctor.Core.Platform.DataSourceStatus.Partial => "◐",
+            GameDoctor.Core.Platform.DataSourceStatus.Missing => "✘",
+            _ => "ℹ",
+        };
+        Console.WriteLine($"  {mark} {d.Name,-24} {d.Detail}");
+        if (d.Hint is not null) Console.WriteLine($"      ➜ {d.Hint}");
+    }
+    return;
+}
+
 // KI-Prompt: gamedoctor prompt [--days 30] [--out prompt.txt]
 // Community-Fingerabdrücke: gamedoctor fingerprint [--days 30] [--save]
 // Zeigt exakt, was später anonym geteilt werden könnte – und was der Datenschutz-Wächter blockiert.
@@ -27,11 +73,11 @@ if (args.Length > 0 && args[0] == "fingerprint")
 
     var res = CrashAnalyzer.Run(new CrashAnalyzerOptions { Days = fDays });
     var secret = GameDoctor.Core.Community.FingerprintStore.GetOrCreateSecret();
-    var inventory = res.Install is null ? new GameDoctor.Core.Community.ModInventory() : GameDoctor.Core.Community.ModInventory.Load(res.Install.Root);
-    var builder = new GameDoctor.Core.Community.FingerprintBuilder(new ModuleClassifier(res.Install?.Root), secret, inventory);
+    var inventory = res.Inventory;
+    var builder = new GameDoctor.Core.Community.FingerprintBuilder(res.Classifier, secret, inventory);
     var ledger = GameDoctor.Core.Games.Cyberpunk.PlaySessionLedger.Load();
     ledger.Harvest(res.Install, res.Crashes);
-    var evaluator = new GameDoctor.Core.Community.FixEvaluator(res.Crashes, ledger, res.Install);
+    var evaluator = new GameDoctor.Core.Community.FixEvaluator(res.Crashes, ledger, res.Install, inventory.ExtraRoots);
     var fixes = GameDoctor.Core.Community.FixAttemptStore.Load().Select(a => (a, evaluator.Evaluate(a)));
     var pkg = GameDoctor.Core.Community.CommunityPackage.Build(res, builder, inventory, secret, fixes);
 
@@ -40,7 +86,7 @@ if (args.Length > 0 && args[0] == "fingerprint")
     if (fOut is not null) File.WriteAllText(fOut, json, Encoding.UTF8);
 
     Console.WriteLine("Stufe 1 – was anonym geteilt würde:");
-    Console.WriteLine($"  Mod-Inventar: {inventory.Mods.Count} öffentliche Mods (Nexus-ID){(inventory.FromVortex ? "" : " – kein Vortex-Manifest gefunden")}, {inventory.PackagesWithoutId} ohne ID ausgelassen");
+    Console.WriteLine($"  Mod-Inventar ({inventory.Manager ?? "kein Mod-Manager erkannt"}): {inventory.Mods.Count} öffentliche Mods (Nexus-ID), {inventory.PackagesWithoutId} ohne ID ausgelassen");
     Console.WriteLine($"  {res.Crashes.Count} Abstürze → {pkg.Fingerprints.Count} Fingerabdrücke (je Absturzstelle einer), {pkg.UnusableCrashes} nicht auswertbar");
     Console.WriteLine($"  {pkg.Pairs.Count:N0} Paar-Meldungen „Absturzstelle × installierte Mod“, {pkg.Census.Count} Verbreitungs-Meldungen, {pkg.FixOutcomes.Count} Ergebnisse von Lösungsversuchen");
     Console.WriteLine($"  Vom Datenschutz-Wächter blockiert: {pkg.BlockedByGuard}");
