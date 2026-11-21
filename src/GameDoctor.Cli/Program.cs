@@ -12,6 +12,37 @@ if (args.Length > 0 && args[0] == "perf")
 }
 
 // KI-Prompt: gamedoctor prompt [--days 30] [--out prompt.txt]
+// Community-Fingerabdrücke: gamedoctor fingerprint [--days 30] [--save]
+// Zeigt exakt, was später anonym geteilt werden könnte – und was der Datenschutz-Wächter blockiert.
+if (args.Length > 0 && args[0] == "fingerprint")
+{
+    int fDays = 30;
+    bool save = args.Contains("--save");
+    for (int i = 1; i < args.Length; i++)
+        if (args[i] == "--days") fDays = int.Parse(args[++i]);
+
+    var res = CrashAnalyzer.Run(new CrashAnalyzerOptions { Days = fDays });
+    var builder = new GameDoctor.Core.Community.FingerprintBuilder(
+        new ModuleClassifier(res.Install?.Root), GameDoctor.Core.Community.FingerprintStore.GetOrCreateSecret());
+
+    var fps = new List<GameDoctor.Core.Community.CrashFingerprint>();
+    int blocked = 0, unusable = 0;
+    foreach (var c in res.Crashes)
+    {
+        var fp = builder.TryBuild(c, res, out var violations);
+        if (fp is not null) { fps.Add(fp); continue; }
+        if (violations.Count == 0) { unusable++; continue; }
+        blocked++;
+        Console.Error.WriteLine($"BLOCKIERT ({c.Report.Time:dd.MM. HH:mm}): {string.Join(", ", violations.Select(v => $"{v.Rule} „{v.Match}“"))}");
+    }
+
+    var distinct = fps.GroupBy(f => f.DedupKey).Select(g => g.First()).ToList();
+    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(distinct, GameDoctor.Core.Community.FingerprintBuilder.Json));
+    Console.Error.WriteLine($"{res.Crashes.Count} Abstürze → {fps.Count} Fingerabdrücke, davon {distinct.Count} verschieden (Doppelzähl-Schutz), {unusable} ohne auswertbaren Dump, {blocked} vom Datenschutz-Wächter blockiert.");
+    if (save) Console.Error.WriteLine($"Lokal gespeichert: {GameDoctor.Core.Community.FingerprintStore.Merge(distinct)} neu in {GameDoctor.Core.Community.FingerprintStore.Dir}");
+    return;
+}
+
 if (args.Length > 0 && args[0] == "prompt")
 {
     int pDays = 30;
