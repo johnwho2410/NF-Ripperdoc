@@ -1,4 +1,5 @@
 using System.Diagnostics.Eventing.Reader;
+using GameDoctor.Core.Localization;
 
 namespace GameDoctor.Core.Platform;
 
@@ -33,7 +34,7 @@ public static class WindowsEventScanner
                 var code = FormatHex(p[6].Value);
                 var offset = FormatHex(p[7].Value);
                 events.Add(new SystemEvent(rec.TimeCreated ?? DateTime.MinValue, SystemEventKind.AppCrash,
-                    $"{app} abgestürzt in {module} (Code {code}, Offset {offset})", module, code, offset));
+                    L.F("{0} abgestürzt in {1} (Code {2}, Offset {3})", app, module, code, offset), module, code, offset));
             });
 
         // Grafiktreiber-Timeouts (TDR)
@@ -44,20 +45,20 @@ public static class WindowsEventScanner
                 string provider = rec.ProviderName;
                 if (provider == "Display" && rec.Id != 4101) return;
                 events.Add(new SystemEvent(rec.TimeCreated ?? DateTime.MinValue, SystemEventKind.GpuTimeout,
-                    $"Grafiktreiber-Problem ({provider}, Ereignis {rec.Id})"));
+                    L.F("Grafiktreiber-Problem ({0}, Ereignis {1})", provider, rec.Id)));
             });
 
         // Hardwarefehler
         Query("System",
             $"*[System[Provider[@Name='Microsoft-Windows-WHEA-Logger'] and TimeCreated[timediff(@SystemTime) <= {ms}]]]",
             rec => events.Add(new SystemEvent(rec.TimeCreated ?? DateTime.MinValue, SystemEventKind.Whea,
-                $"Hardwarefehler gemeldet (WHEA, Ereignis {rec.Id}, Stufe {rec.LevelDisplayNameSafe()})")));
+                L.F("Hardwarefehler gemeldet (WHEA, Ereignis {0}, Stufe {1})", rec.Id, rec.LevelDisplayNameSafe()))));
 
         // Unerwartete Neustarts
         Query("System",
             $"*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41 and TimeCreated[timediff(@SystemTime) <= {ms}]]]",
             rec => events.Add(new SystemEvent(rec.TimeCreated ?? DateTime.MinValue, SystemEventKind.UnexpectedShutdown,
-                "PC wurde unerwartet neu gestartet / ausgeschaltet (Kernel-Power 41)")));
+                L.T("PC wurde unerwartet neu gestartet / ausgeschaltet (Kernel-Power 41)"))));
 
         return events.OrderByDescending(e => e.Time).ToList();
     }

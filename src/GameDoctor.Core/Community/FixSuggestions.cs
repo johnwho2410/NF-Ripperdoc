@@ -1,4 +1,5 @@
 using GameDoctor.Core.Analysis;
+using GameDoctor.Core.Localization;
 
 namespace GameDoctor.Core.Community;
 
@@ -28,10 +29,10 @@ public static class FixSuggestions
                 var label = classifier.FriendlyName(module);
                 int coupled = sameSig.Count(c => c.Dump?.StackHits.Any(h => h.Module.Name.Equals(module.Name, StringComparison.OrdinalIgnoreCase)) == true);
                 var reason = sameSig.Count >= 2
-                    ? $"Lag bei {coupled} von {sameSig.Count} Abstürzen an dieser Stelle im Aufrufpfad."
-                    : "Lag beim Absturz im Aufrufpfad.";
+                    ? L.F("Lag bei {0} von {1} Abstürzen an dieser Stelle im Aufrufpfad.", coupled, sameSig.Count)
+                    : L.T("Lag beim Absturz im Aufrufpfad.");
                 var files = mod is not null ? inventory.FilesOf(mod.NexusId) : [module.Name];
-                list.Add(new FixSuggestion($"„{label}“ deaktivieren", reason, FixAction.DisableMod,
+                list.Add(new FixSuggestion(L.F("„{0}“ deaktivieren", label), reason, FixAction.DisableMod,
                     mod?.DisplayName ?? label, mod?.NexusId, files.Count > 0 ? files : [module.Name])
                 { ModuleFile = module.Name });
             }
@@ -44,8 +45,8 @@ public static class FixSuggestions
             var mods = inventory.Mods.Where(m => inventory.FilesOf(m.NexusId)
                 .Any(f => f.ToLowerInvariant().Replace(" ", "_").Contains(token))).ToList();
             foreach (var mod in mods.Take(2))
-                list.Add(new FixSuggestion($"„{mod.DisplayName}“ deaktivieren",
-                    $"{u.Items.Count} Inhalte dieser Mod („{u.Owner}“) werden vom Spiel nicht gefunden.",
+                list.Add(new FixSuggestion(L.F("„{0}“ deaktivieren", mod.DisplayName),
+                    L.F("{0} Inhalte dieser Mod („{1}“) werden vom Spiel nicht gefunden.", u.Items.Count, u.Owner),
                     FixAction.DisableMod, mod.DisplayName, mod.NexusId, inventory.FilesOf(mod.NexusId)));
         }
 

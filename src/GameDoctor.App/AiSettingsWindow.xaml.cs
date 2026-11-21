@@ -1,3 +1,4 @@
+using GameDoctor.Core.Localization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -26,7 +27,7 @@ public partial class AiSettingsWindow : Window
         {
             var rb = new RadioButton
             {
-                Content = p.Name,
+                Content = L.T(p.Name),
                 Tag = p.Id,
                 GroupName = "provider",
                 Style = (Style)FindResource("Segment"),
@@ -58,14 +59,14 @@ public partial class AiSettingsWindow : Window
 
     private void UpdateProviderUi()
     {
-        ProviderHint.Text = Provider.Hint;
+        ProviderHint.Text = L.T(Provider.Hint);
         KeyPanel.Visibility = Provider.NeedsKey ? Visibility.Visible : Visibility.Collapsed;
         // Beim Anthropic-SDK ist die Adresse fest eingebaut.
         BaseUrlPanel.Visibility = Provider.Api == AiApi.Anthropic ? Visibility.Collapsed : Visibility.Visible;
         bool sameProvider = _providerId == _settings.Provider.Id;
         KeyState.Text = sameProvider && _settings.HasApiKey
-            ? "Ein Key ist gespeichert (verschlüsselt, nur für deinen Windows-Benutzer lesbar). Feld leer lassen, um ihn zu behalten."
-            : "Wird verschlüsselt gespeichert und ist nur für deinen Windows-Benutzer auf diesem PC lesbar.";
+            ? L.T("Ein Key ist gespeichert (verschlüsselt, nur für deinen Windows-Benutzer lesbar). Feld leer lassen, um ihn zu behalten.")
+            : L.T("Wird verschlüsselt gespeichert und ist nur für deinen Windows-Benutzer auf diesem PC lesbar.");
         SetStatus("", false);
     }
 
@@ -88,14 +89,14 @@ public partial class AiSettingsWindow : Window
     {
         var s = Collect();
         LoadModelsButton.IsEnabled = false;
-        SetStatus("Lade Modellliste …", false);
+        SetStatus(L.T("Lade Modellliste …"), false);
         try
         {
             using var client = AiClient.Create(s);
             var models = await client.ListModelsAsync();
             ModelList.ItemsSource = models;
             ModelList.Visibility = models.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            SetStatus(models.Count > 0 ? $"{models.Count} Modelle gefunden – eins anklicken." : "Der Dienst hat keine Modelle gemeldet.", false);
+            SetStatus(models.Count > 0 ? L.F("{0} Modelle gefunden – eins anklicken.", models.Count) : L.T("Der Dienst hat keine Modelle gemeldet."), false);
         }
         catch (AiException ex)
         {
@@ -121,14 +122,14 @@ public partial class AiSettingsWindow : Window
             return;
         }
         TestButton.IsEnabled = false;
-        SetStatus($"Teste {s.Provider.Name} mit „{s.EffectiveModel}“ …", false);
+        SetStatus(L.F("Teste {0} mit „{1}“ …", L.T(s.Provider.Name), s.EffectiveModel), false);
         try
         {
             using var client = AiClient.Create(s);
             var answer = "";
-            await foreach (var part in client.StreamChatAsync([AiMessage.User("Antworte nur mit dem Wort: OK")]))
+            await foreach (var part in client.StreamChatAsync([AiMessage.User(L.T("Antworte nur mit dem Wort: OK"))]))
                 answer += part;
-            SetStatus($"Verbindung klappt. Antwort des Modells: {answer.Trim()}", false, good: true);
+            SetStatus(L.F("Verbindung klappt. Antwort des Modells: {0}", answer.Trim()), false, good: true);
         }
         catch (AiException ex)
         {
@@ -154,9 +155,9 @@ public partial class AiSettingsWindow : Window
     }
 
     private static string MissingText(AiSettings s) =>
-        string.IsNullOrWhiteSpace(s.EffectiveBaseUrl) ? "Bitte die Adresse der Schnittstelle eintragen."
-        : string.IsNullOrWhiteSpace(s.EffectiveModel) ? "Bitte ein Modell eintragen oder über „Modelle laden“ auswählen."
-        : "Bitte einen API-Key eintragen.";
+        string.IsNullOrWhiteSpace(s.EffectiveBaseUrl) ? L.T("Bitte die Adresse der Schnittstelle eintragen.")
+        : string.IsNullOrWhiteSpace(s.EffectiveModel) ? L.T("Bitte ein Modell eintragen oder über „Modelle laden“ auswählen.")
+        : L.T("Bitte einen API-Key eintragen.");
 
     private void SetStatus(string text, bool error, bool good = false)
     {

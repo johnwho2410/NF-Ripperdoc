@@ -1,4 +1,5 @@
 using System.Text.Json;
+using GameDoctor.Core.Localization;
 
 namespace GameDoctor.Core.Games.Cyberpunk;
 
@@ -65,11 +66,13 @@ public sealed class CyberpunkSettings
     public string Summary()
     {
         var parts = new List<string> { $"{Resolution ?? "?"}", $"{Upscaler ?? "?"} {DlssMode}".Trim() };
-        parts.Add(PathTracing ? "Pathtracing" : RayTracing ? $"Raytracing (Licht: {RtLighting ?? "?"}, Spiegelungen: {(RtReflections ? "an" : "aus")})" : "kein Raytracing");
-        parts.Add($"Texturen {TextureQuality ?? "?"}");
+        parts.Add(PathTracing ? L.T("Pathtracing") : RayTracing
+            ? L.F("Raytracing (Licht: {0}, Spiegelungen: {1})", RtLighting ?? "?", RtReflections ? L.T("an") : L.T("aus"))
+            : L.T("kein Raytracing"));
+        parts.Add(L.F("Texturen {0}", TextureQuality ?? "?"));
         parts.Add($"Crowd {CrowdDensity ?? "?"}");
         parts.Add($"Reflex {Reflex ?? "?"}");
-        if (DlssFrameGen || FrameGeneration is { } fg && fg != "Off") parts.Add("Frame Generation an");
+        if (DlssFrameGen || FrameGeneration is { } fg && fg != "Off") parts.Add(L.T("Frame Generation an"));
         return string.Join(" · ", parts);
     }
 }

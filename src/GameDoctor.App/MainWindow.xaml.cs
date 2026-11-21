@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using GameDoctor.Core.Localization;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -36,7 +37,7 @@ public partial class MainWindow : Window
     {
         if (_vm.IsBusy) return;
         _vm.IsBusy = true;
-        _vm.Status = "Starte Analyse …";
+        _vm.Status = L.T("Starte Analyse …");
         try
         {
             var options = new CrashAnalyzerOptions { Days = _vm.Days };
@@ -45,12 +46,12 @@ public partial class MainWindow : Window
             var result = await Task.Run(() => CrashAnalyzer.Run(options, ((IProgress<string>)progress).Report));
             _vm.Load(result);
             await RefreshFixesAsync(result);
-            _vm.Status = $"Analyse abgeschlossen: {result.Crashes.Count} Abstürze, {DateTime.Now:HH:mm} Uhr";
+            _vm.Status = L.F("Analyse abgeschlossen: {0} Abstürze, {1:t}", result.Crashes.Count, DateTime.Now);
         }
         catch (Exception ex)
         {
-            _vm.Status = "Analyse fehlgeschlagen: " + ex.Message;
-            MessageBox.Show(this, ex.ToString(), "Analyse fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
+            _vm.Status = L.F("Analyse fehlgeschlagen: {0}", ex.Message);
+            MessageBox.Show(this, ex.ToString(), L.T("Analyse fehlgeschlagen"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -83,15 +84,15 @@ public partial class MainWindow : Window
 
     private async void SetGameFolder_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new OpenFolderDialog { Title = "Cyberpunk-2077-Spielordner auswählen (der Ordner, in dem „bin“ und „archive“ liegen)" };
+        var dlg = new OpenFolderDialog { Title = L.T("Cyberpunk-2077-Spielordner auswählen (der Ordner, in dem „bin“ und „archive“ liegen)") };
         if (dlg.ShowDialog(this) != true) return;
 
         var folder = NormalizeGameFolder(dlg.FolderName);
         if (folder is null)
         {
-            MessageBox.Show(this, $"In „{dlg.FolderName}“ wurde kein Cyberpunk 2077 gefunden (bin\\x64\\Cyberpunk2077.exe fehlt).\n\n" +
-                "Bitte den Hauptordner des Spiels wählen – bei Steam z. B. …\\steamapps\\common\\Cyberpunk 2077.",
-                "Kein Spielordner", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, L.F("In „{0}“ wurde kein Cyberpunk 2077 gefunden (bin\\x64\\Cyberpunk2077.exe fehlt).", dlg.FolderName) + "\n\n" +
+                L.T("Bitte den Hauptordner des Spiels wählen – bei Steam z. B. …\\steamapps\\common\\Cyberpunk 2077."),
+                L.T("Kein Spielordner"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         var ps = GameDoctor.Core.Platform.PathSettings.Load();
@@ -114,12 +115,11 @@ public partial class MainWindow : Window
 
     private async void SetMo2_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new OpenFolderDialog { Title = "Mod-Organizer-2-Instanz auswählen (Ordner mit ModOrganizer.ini)" };
+        var dlg = new OpenFolderDialog { Title = L.T("Mod-Organizer-2-Instanz auswählen (Ordner mit ModOrganizer.ini)") };
         if (dlg.ShowDialog(this) != true) return;
         if (!File.Exists(Path.Combine(dlg.FolderName, "ModOrganizer.ini")))
         {
-            MessageBox.Show(this, "In diesem Ordner liegt keine ModOrganizer.ini.\n\nBei einer portablen Installation ist das der Ordner von ModOrganizer.exe, " +
-                "sonst %LOCALAPPDATA%\\ModOrganizer\\<Instanzname>.", "Keine MO2-Instanz", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, L.T("In diesem Ordner liegt keine ModOrganizer.ini.\n\nBei einer portablen Installation ist das der Ordner von ModOrganizer.exe, sonst %LOCALAPPDATA%\\ModOrganizer\\<Instanzname>."), L.T("Keine MO2-Instanz"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         var ps = GameDoctor.Core.Platform.PathSettings.Load();
@@ -140,15 +140,14 @@ public partial class MainWindow : Window
     private async void SearchGame_Click(object sender, RoutedEventArgs e)
     {
         if (MessageBox.Show(this,
-                "GameDoctor durchsucht jetzt die lokalen Laufwerke nach Cyberpunk 2077 (höchstens 60 Sekunden).\n\n" +
-                "Dabei werden nur Ordnernamen geprüft – keine Dateien geöffnet, nichts übertragen. Windows- und Systemordner werden übersprungen.",
-                "Nach dem Spiel suchen", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
+                L.T("GameDoctor durchsucht jetzt die lokalen Laufwerke nach Cyberpunk 2077 (höchstens 60 Sekunden).\n\nDabei werden nur Ordnernamen geprüft – keine Dateien geöffnet, nichts übertragen. Windows- und Systemordner werden übersprungen."),
+                L.T("Nach dem Spiel suchen"), MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
 
         _vm.IsBusy = true;
         List<string> hits;
         try
         {
-            var progress = new Progress<string>(d => _vm.Status = "Durchsuche " + d);
+            var progress = new Progress<string>(d => _vm.Status = L.F("Durchsuche {0}", d));
             hits = await Task.Run(() => CyberpunkInstall.SearchDrives(TimeSpan.FromSeconds(60), default, ((IProgress<string>)progress).Report));
         }
         finally
@@ -158,13 +157,13 @@ public partial class MainWindow : Window
 
         if (hits.Count == 0)
         {
-            _vm.Status = "Keine Cyberpunk-Installation gefunden.";
-            MessageBox.Show(this, "Keine Installation gefunden. Bitte den Spielordner manuell festlegen.", "Nichts gefunden", MessageBoxButton.OK, MessageBoxImage.Information);
+            _vm.Status = L.T("Keine Cyberpunk-Installation gefunden.");
+            MessageBox.Show(this, L.T("Keine Installation gefunden. Bitte den Spielordner manuell festlegen."), L.T("Nichts gefunden"), MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         foreach (var hit in hits)
         {
-            var answer = MessageBox.Show(this, $"Gefunden:\n{hit}\n\nDiesen Ordner verwenden?", "Cyberpunk gefunden",
+            var answer = MessageBox.Show(this, L.F("Gefunden:\n{0}\n\nDiesen Ordner verwenden?", hit), L.T("Cyberpunk gefunden"),
                 hits.Count > 1 ? MessageBoxButton.YesNoCancel : MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (answer == MessageBoxResult.Cancel) return;
             if (answer != MessageBoxResult.Yes) continue;
@@ -199,9 +198,9 @@ public partial class MainWindow : Window
     private async void FixRecheck_Click(object sender, RoutedEventArgs e)
     {
         if (_vm.Result is not { } result) return;
-        _vm.Status = "Prüfe Lösungsversuche …";
+        _vm.Status = L.T("Prüfe Lösungsversuche …");
         await RefreshFixesAsync(result, redetectMods: true);
-        _vm.Status = $"Lösungsversuche geprüft ({DateTime.Now:HH:mm} Uhr).";
+        _vm.Status = L.F("Lösungsversuche geprüft ({0:t}).", DateTime.Now);
     }
 
     private async void NewFix_Click(object sender, RoutedEventArgs e)
@@ -213,8 +212,8 @@ public partial class MainWindow : Window
         await RefreshFixesAsync(result);
         Tabs.SelectedIndex = 4;
         _vm.Status = dlg.Created.Action == FixAction.DisableMod
-            ? $"Beobachtung gestartet: {dlg.Created.TargetLabel}. Jetzt die Mod selbst deaktivieren und dann „Erneut prüfen“ klicken."
-            : $"Beobachtung gestartet: {dlg.Created.TargetLabel}. Spiel jetzt ganz normal weiter – GameDoctor wertet bei jeder Analyse aus.";
+            ? L.F("Beobachtung gestartet: {0}. Jetzt die Mod selbst deaktivieren und dann „Erneut prüfen“ klicken.", dlg.Created.TargetLabel)
+            : L.F("Beobachtung gestartet: {0}. Spiel jetzt ganz normal weiter – GameDoctor wertet bei jeder Analyse aus.", dlg.Created.TargetLabel);
     }
 
     private async void FixHelped_Click(object sender, RoutedEventArgs e) => await SetVerdict(sender, UserVerdict.Helped);
@@ -234,7 +233,7 @@ public partial class MainWindow : Window
     private async void FixRemove_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: Guid id } || _vm.Result is not { } result) return;
-        if (MessageBox.Show(this, "Diesen Lösungsversuch entfernen?", "Entfernen", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show(this, L.T("Diesen Lösungsversuch entfernen?"), L.T("Entfernen"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         FixAttemptStore.Remove(id);
         await RefreshFixesAsync(result);
     }
@@ -254,7 +253,7 @@ public partial class MainWindow : Window
             {
                 if (OverlayController.WindowModeProblem(CyberpunkSettings.TryLoad()?.WindowMode) is { } problem)
                 {
-                    var answer = MessageBox.Show(this, problem + "\n\nOverlay trotzdem einblenden?", "Ingame-Overlay",
+                    var answer = MessageBox.Show(this, problem + "\n\n" + L.T("Overlay trotzdem einblenden?"), L.T("Ingame-Overlay"),
                         MessageBoxButton.YesNo, MessageBoxImage.Warning);
                     if (answer != MessageBoxResult.Yes) return false;
                 }
@@ -267,7 +266,7 @@ public partial class MainWindow : Window
         Closed += (_, _) => _overlay.Dispose();
 
         _vm.Perf.PresentMonAvailable = PresentMonTool.Find() is not null;
-        _vm.Perf.Hint = "Starte die Aufnahme, wechsle ins Spiel und spiele 2–5 Minuten. Danach hier auf „Aufnahme beenden“.";
+        _vm.Perf.Hint = L.T("Starte die Aufnahme, wechsle ins Spiel und spiele 2–5 Minuten. Danach hier auf „Aufnahme beenden“.");
         Closing += (_, _) =>
         {
             // Läuft beim Schließen noch eine Aufnahme, wird sie wenigstens gespeichert
@@ -281,13 +280,16 @@ public partial class MainWindow : Window
         // Letzte Aufnahme anzeigen, damit das Ergebnis nach einem Neustart nicht weg ist
         if (RecordingStore.Latest() is { } latest)
         {
-            try { ShowRecording(RecordingStore.Load(latest), $"Letzte Aufnahme geladen ({File.GetLastWriteTime(latest):dd.MM. HH:mm})."); }
+            try { ShowRecording(RecordingStore.Load(latest), L.F("Letzte Aufnahme geladen ({0:g}).", File.GetLastWriteTime(latest))); }
             catch { /* defekte Datei ignorieren */ }
         }
     }
 
+    private PerformanceRecording? _shownRecording;
+
     private void ShowRecording(PerformanceRecording recording, string hint)
     {
+        _shownRecording = recording;
         var report = PerformanceAnalyzer.Analyze(recording, CyberpunkSettings.TryLoad());
         _vm.Perf.ShowReport(report);
         _vm.Perf.Hint = hint;
@@ -297,18 +299,18 @@ public partial class MainWindow : Window
     {
         var dlg = new OpenFileDialog
         {
-            Title = "Aufnahme öffnen",
+            Title = L.T("Aufnahme öffnen"),
             Filter = "GameDoctor-Aufnahme (*.json.gz)|*.json.gz",
             InitialDirectory = Directory.Exists(RecordingStore.Dir) ? RecordingStore.Dir : null,
         };
         if (dlg.ShowDialog(this) != true) return;
         try
         {
-            ShowRecording(RecordingStore.Load(dlg.FileName), $"Aufnahme geladen: {Path.GetFileName(dlg.FileName)}");
+            ShowRecording(RecordingStore.Load(dlg.FileName), L.F("Aufnahme geladen: {0}", Path.GetFileName(dlg.FileName)));
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Aufnahme konnte nicht geladen werden", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, ex.Message, L.T("Aufnahme konnte nicht geladen werden"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -325,8 +327,8 @@ public partial class MainWindow : Window
         });
         _recorder.Start();
         perf.IsRecording = true;
-        perf.Hint = "Aufnahme läuft …";
-        _vm.Status = "Performance-Aufnahme gestartet";
+        perf.Hint = L.T("Aufnahme läuft …");
+        _vm.Status = L.T("Performance-Aufnahme gestartet");
     }
 
     private void Record_Click(object sender, RoutedEventArgs e)
@@ -346,10 +348,10 @@ public partial class MainWindow : Window
         string saved = "";
         if (recording.Frames.Count > 0 || recording.Sensors.Count > 0)
         {
-            try { saved = " Gespeichert unter " + RecordingStore.Save(recording); }
-            catch (Exception ex) { saved = " (Speichern fehlgeschlagen: " + ex.Message + ")"; }
+            try { saved = " " + L.F("Gespeichert unter {0}", RecordingStore.Save(recording)); }
+            catch (Exception ex) { saved = " " + L.F("(Speichern fehlgeschlagen: {0})", ex.Message); }
         }
-        ShowRecording(recording, $"Aufnahme beendet: {recording.Duration:mm\\:ss} min.");
+        ShowRecording(recording, L.F("Aufnahme beendet: {0} min.", recording.Duration.ToString(@"mm\:ss")));
         _vm.Status = perf.Hint + saved;
     }
 
@@ -365,22 +367,22 @@ public partial class MainWindow : Window
     private async void DownloadPresentMon_Click(object sender, RoutedEventArgs e)
     {
         var answer = MessageBox.Show(this,
-            "PresentMon (Intel, Open Source, MIT-Lizenz, ca. 1 MB) wird vom offiziellen GitHub-Release heruntergeladen:\n\n" +
-            PresentMonTool.DownloadUrl + "\n\nDie Datei wird per Prüfsumme kontrolliert und unter\n" + PresentMonTool.ToolsDir + "\nabgelegt. Fortfahren?",
-            "PresentMon herunterladen", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            L.F("PresentMon (Intel, Open Source, MIT-Lizenz, ca. 1 MB) wird vom offiziellen GitHub-Release heruntergeladen:\n\n{0}\n\nDie Datei wird per Prüfsumme kontrolliert und unter\n{1}\nabgelegt. Fortfahren?",
+                PresentMonTool.DownloadUrl, PresentMonTool.ToolsDir),
+            L.T("PresentMon herunterladen"), MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (answer != MessageBoxResult.Yes) return;
 
         try
         {
-            _vm.Status = "Lade PresentMon herunter …";
+            _vm.Status = L.T("Lade PresentMon herunter …");
             await PresentMonTool.DownloadAsync();
             _vm.Perf.PresentMonAvailable = true;
-            _vm.Status = "PresentMon installiert.";
+            _vm.Status = L.T("PresentMon installiert.");
         }
         catch (Exception ex)
         {
-            _vm.Status = "Download fehlgeschlagen: " + ex.Message;
-            MessageBox.Show(this, ex.Message, "Download fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error);
+            _vm.Status = L.F("Download fehlgeschlagen: {0}", ex.Message);
+            MessageBox.Show(this, ex.Message, L.T("Download fehlgeschlagen"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -389,13 +391,13 @@ public partial class MainWindow : Window
         if (_vm.Result is null) return;
         var dlg = new SaveFileDialog
         {
-            Title = "Bericht speichern",
-            Filter = "Markdown-Bericht (*.md)|*.md",
-            FileName = $"cyberpunk-absturzbericht-{DateTime.Now:yyyy-MM-dd}.md",
+            Title = L.T("Bericht speichern"),
+            Filter = L.T("Markdown-Bericht (*.md)|*.md"),
+            FileName = L.F("cyberpunk-absturzbericht-{0:yyyy-MM-dd}.md", DateTime.Now),
         };
         if (dlg.ShowDialog(this) != true) return;
         File.WriteAllText(dlg.FileName, MarkdownReport.Build(_vm.Result, 10), Encoding.UTF8);
-        _vm.Status = $"Bericht gespeichert: {dlg.FileName}";
+        _vm.Status = L.F("Bericht gespeichert: {0}", dlg.FileName);
     }
 
     private void OpenFolder_Click(object sender, RoutedEventArgs e)
@@ -418,6 +420,17 @@ public partial class MainWindow : Window
 
     // ------------------------------------------------------------------ Skin
 
+    /// <summary>Wechselt zwischen Deutsch und Englisch, merkt sich die Wahl und analysiert neu.</summary>
+    private async void Language_Click(object sender, RoutedEventArgs e)
+    {
+        var lang = L.Language == "de" ? "en" : "de";
+        AppSettings.Update(s => s.Language = lang);
+        L.SetLanguage(lang);
+        _vm.Perf.RefreshLanguage();
+        if (_shownRecording is not null && _recorder is null) ShowRecording(_shownRecording, "");
+        if (_vm.IsIdle) await RunAnalysisAsync();
+    }
+
     private void Skin_Click(object sender, RoutedEventArgs e)
     {
         var menu = new ContextMenu
@@ -429,8 +442,8 @@ public partial class MainWindow : Window
         {
             var item = new MenuItem
             {
-                Header = skin.Name,
-                ToolTip = skin.Description,
+                Header = L.T(skin.Name),
+                ToolTip = L.T(skin.Description),
                 IsCheckable = true,
                 IsChecked = skin.Id == ThemeManager.Current.Id,
             };

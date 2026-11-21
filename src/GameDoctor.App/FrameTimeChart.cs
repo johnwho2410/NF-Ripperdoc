@@ -1,3 +1,4 @@
+using GameDoctor.Core.Localization;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
@@ -62,7 +63,7 @@ public sealed class FrameTimeChart : FrameworkElement
         var series = Series;
         if (series is null || series.Count < 2)
         {
-            Text(dc, "Noch keine Daten", left + pw / 2 - 50, top + ph / 2 - 8, LabelBrush);
+            Text(dc, L.T("Noch keine Daten"), left + pw / 2 - 50, top + ph / 2 - 8, LabelBrush);
             return;
         }
 

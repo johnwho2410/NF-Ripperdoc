@@ -1,3 +1,4 @@
+using GameDoctor.Core.Localization;
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -49,7 +50,7 @@ public partial class OverlayWindow : Window
     {
         bool hasFrames = s.GameRunning && s.FrameCount > 0;
         FpsText.Text = hasFrames && s.Fps is double fps ? fps.ToString("F0") : "–";
-        LowText.Text = hasFrames && s.OnePercentLowFps is double low ? $"1 % Low {low:F0}" : "";
+        LowText.Text = hasFrames && s.OnePercentLowFps is double low ? L.F("1 % Low {0:F0}", low) : "";
         BottleneckText.Text = hasFrames ? s.Bottleneck ?? "" : "";
         Spark.Values = s.RecentFrameTimes;
 
@@ -58,7 +59,7 @@ public partial class OverlayWindow : Window
         if (s.VramUsedMb is double vu && s.VramTotalMb is double vt && vt > 0) parts.Add($"VRAM {vu / 1024:F1}/{vt / 1024:F0}G");
         if (s.RamTotalGb > 0) parts.Add($"RAM {s.RamUsedGb:F1}/{s.RamTotalGb:F0}G");
         if (s.GpuTempC is double t) parts.Add($"{t:F0}°C");
-        DetailText.Text = hasFrames ? string.Join("  ", parts) : (s.GameRunning ? "Warte auf Frames …" : "Spiel läuft nicht");
+        DetailText.Text = hasFrames ? string.Join("  ", parts) : (s.GameRunning ? L.T("Warte auf Frames …") : L.T("Spiel läuft nicht"));
     }
 
     /// <summary>Hinweise einblenden; sie verschwinden nach <see cref="AlertDuration"/> von selbst.</summary>

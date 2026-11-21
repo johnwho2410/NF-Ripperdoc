@@ -1,21 +1,22 @@
 using System.Text;
 using GameDoctor.Core.Analysis;
+using GameDoctor.Core.Localization;
 
 namespace GameDoctor.Core.Report;
 
-/// <summary>Erzeugt einen lesbaren Bericht (Markdown) aus dem Analyseergebnis.</summary>
+/// <summary>Erzeugt einen lesbaren Bericht (Markdown) aus dem Analyseergebnis – in der eingestellten Sprache.</summary>
 public static class MarkdownReport
 {
     public static string Build(AnalysisResult r, int detailedCrashes = 5)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("# GameDoctor – Absturzanalyse Cyberpunk 2077");
+        sb.AppendLine(L.T("# GameDoctor – Absturzanalyse Cyberpunk 2077"));
         sb.AppendLine();
-        sb.AppendLine($"Erstellt: {DateTime.Now:dd.MM.yyyy HH:mm}  ");
-        sb.AppendLine($"Spiel: {r.Install?.Root ?? "nicht gefunden"} ({r.Install?.Store ?? "?"}), Version {r.GameVersion ?? "?"}  ");
+        sb.AppendLine(L.F("Erstellt: {0:g}", DateTime.Now) + "  ");
+        sb.AppendLine(L.F("Spiel: {0} ({1}), Version {2}", r.Install?.Root ?? L.T("nicht gefunden"), r.Install is null ? "?" : L.T(r.Install.Store), r.GameVersion ?? "?") + "  ");
         if (r.ModLogs is { } ml)
             sb.AppendLine($"RED4ext {ml.Red4ExtVersion ?? "–"} · CET {ml.CetVersion ?? "–"}  ");
-        sb.AppendLine($"Ausgewertete Abstürze: {r.Crashes.Count}");
+        sb.AppendLine(L.F("Ausgewertete Abstürze: {0}", r.Crashes.Count));
         sb.AppendLine();
 
         // Kurzfassung: die wichtigsten Erkenntnisse zuerst
@@ -23,41 +24,41 @@ public static class MarkdownReport
             .Concat(r.PatternFindings).Concat(r.EnvironmentFindings)
             .Where(f => f.Severity >= Severity.Warning)
             .OrderByDescending(f => f.Severity).Take(6).ToList();
-        sb.AppendLine("## Kurzfassung");
+        sb.AppendLine(L.T("## Kurzfassung"));
         sb.AppendLine();
-        if (top.Count == 0) sb.AppendLine("Keine kritischen Auffälligkeiten gefunden.");
+        if (top.Count == 0) sb.AppendLine(L.T("Keine kritischen Auffälligkeiten gefunden."));
         foreach (var f in top) sb.AppendLine($"- {Icon(f.Severity)} **{f.Title}**");
         sb.AppendLine();
 
         if (r.PatternFindings.Count > 0)
         {
-            sb.AppendLine("## Muster über alle Abstürze");
+            sb.AppendLine(L.T("## Muster über alle Abstürze"));
             sb.AppendLine();
             foreach (var f in r.PatternFindings) WriteFinding(sb, f);
         }
 
-        sb.AppendLine($"## Die letzten {Math.Min(detailedCrashes, r.Crashes.Count)} Abstürze im Detail");
+        sb.AppendLine(L.F("## Die letzten {0} Abstürze im Detail", Math.Min(detailedCrashes, r.Crashes.Count)));
         sb.AppendLine();
         foreach (var c in r.Crashes.Take(detailedCrashes))
         {
             var rep = c.Report;
-            sb.AppendLine($"### {rep.Time:dd.MM.yyyy HH:mm:ss} – {c.FaultLabel}");
+            sb.AppendLine(L.F("### {0:G} – {1}", rep.Time, c.FaultLabel));
             sb.AppendLine();
             sb.AppendLine("| | |");
             sb.AppendLine("|---|---|");
-            sb.AppendLine($"| Signatur | `{c.Signature}` |");
-            sb.AppendLine($"| Fehler | {rep.Expression ?? rep.ErrorReason ?? "?"} |");
-            sb.AppendLine($"| Laufzeit bis Absturz | {(rep.UptimeSeconds is int u ? TimeSpan.FromSeconds(u).ToString(@"h\:mm\:ss") : "?")} |");
-            sb.AppendLine($"| Ladezustand | {rep.LoadingStage ?? "?"} |");
+            sb.AppendLine($"| {L.T("Signatur")} | `{c.Signature}` |");
+            sb.AppendLine($"| {L.T("Fehler")} | {rep.Expression ?? rep.ErrorReason ?? "?"} |");
+            sb.AppendLine($"| {L.T("Laufzeit bis Absturz")} | {(rep.UptimeSeconds is int u ? TimeSpan.FromSeconds(u).ToString(@"h\:mm\:ss") : "?")} |");
+            sb.AppendLine($"| {L.T("Ladezustand")} | {rep.LoadingStage ?? "?"} |");
             sb.AppendLine($"| VRAM | {rep.VramUsedMb?.ToString() ?? "?"} / {rep.VramTotalMb?.ToString() ?? "?"} MB |");
-            sb.AppendLine($"| GPU / Treiber | {rep.GpuName ?? "?"} / {rep.GpuDriver ?? "?"} |");
+            sb.AppendLine($"| {L.T("GPU / Treiber")} | {rep.GpuName ?? "?"} / {rep.GpuDriver ?? "?"} |");
             sb.AppendLine($"| Patch | {rep.Patch ?? "?"} ({rep.InternalVersion ?? "?"}) |");
-            sb.AppendLine($"| Ordner | `{rep.Folder}` |");
+            sb.AppendLine($"| {L.T("Ordner")} | `{rep.Folder}` |");
             sb.AppendLine();
             foreach (var f in c.Findings) WriteFinding(sb, f);
             if (c.SuspectModules.Count > 0)
             {
-                sb.AppendLine("<details><summary>Nicht-Vanilla-Module auf dem Stack</summary>");
+                sb.AppendLine($"<details><summary>{L.T("Nicht-Vanilla-Module auf dem Stack")}</summary>");
                 sb.AppendLine();
                 foreach (var s in c.SuspectModules) sb.AppendLine($"- {s.Name} – {ModuleClassifier.KindLabel(s.Kind)} ({s.Hits}×)");
                 sb.AppendLine();
@@ -68,22 +69,22 @@ public static class MarkdownReport
 
         if (r.EnvironmentFindings.Count > 0)
         {
-            sb.AppendLine("## Mod-Umgebung und System");
+            sb.AppendLine(L.T("## Mod-Umgebung und System"));
             sb.AppendLine();
             foreach (var f in r.EnvironmentFindings.OrderByDescending(f => f.Severity)) WriteFinding(sb, f);
         }
 
-        sb.AppendLine("## Alle Abstürze");
+        sb.AppendLine(L.T("## Alle Abstürze"));
         sb.AppendLine();
-        sb.AppendLine("| Zeit | Ort | Signatur | Laufzeit |");
+        sb.AppendLine(L.T("| Zeit | Ort | Signatur | Laufzeit |"));
         sb.AppendLine("|---|---|---|---|");
         foreach (var c in r.Crashes)
-            sb.AppendLine($"| {c.Report.Time:dd.MM. HH:mm} | {ModuleClassifier.KindLabel(c.FaultKind)}: {c.FaultLabel} | `{c.Signature}` | {(c.Report.UptimeSeconds is int u ? TimeSpan.FromSeconds(u).ToString(@"h\:mm\:ss") : "?")} |");
+            sb.AppendLine($"| {L.F("{0:g}", c.Report.Time)} | {ModuleClassifier.KindLabel(c.FaultKind)}: {c.FaultLabel} | `{c.Signature}` | {(c.Report.UptimeSeconds is int u ? TimeSpan.FromSeconds(u).ToString(@"h\:mm\:ss") : "?")} |");
         sb.AppendLine();
 
-        sb.AppendLine("## Datenquellen");
+        sb.AppendLine(L.T("## Datenquellen"));
         sb.AppendLine();
-        sb.AppendLine("| | Quelle | Stand |");
+        sb.AppendLine(L.T("| | Quelle | Stand |"));
         sb.AppendLine("|---|---|---|");
         foreach (var d in r.DataSources)
         {
@@ -98,7 +99,7 @@ public static class MarkdownReport
         }
         sb.AppendLine();
         sb.AppendLine("---");
-        sb.AppendLine("*Hinweis: „Mods auf dem Stack“ ist eine Heuristik. Sie liefert starke Indizien, aber keinen Beweis.*");
+        sb.AppendLine(L.T("*Hinweis: „Mods auf dem Stack“ ist eine Heuristik. Sie liefert starke Indizien, aber keinen Beweis.*"));
         return sb.ToString();
     }
 

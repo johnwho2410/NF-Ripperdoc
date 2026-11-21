@@ -32,7 +32,7 @@ public static class MinidumpReader
             using var br = new BinaryReader(fs);
 
             if (br.ReadUInt32() != Signature)
-                return new DumpAnalysis { Error = "Keine gültige Minidump-Datei (Signatur fehlt)." };
+                return new DumpAnalysis { Error = Localization.L.T("Keine gültige Minidump-Datei (Signatur fehlt).") };
 
             br.ReadUInt32(); // Version
             uint streamCount = br.ReadUInt32();
@@ -52,7 +52,7 @@ public static class MinidumpReader
             var memory = ReadMemoryRanges(br, streams);
 
             if (!streams.TryGetValue(ExceptionStream, out var ex))
-                return new DumpAnalysis { Modules = modules, Error = "Der Dump enthält keine Exception-Information." };
+                return new DumpAnalysis { Modules = modules, Error = Localization.L.T("Der Dump enthält keine Exception-Information.") };
 
             fs.Position = ex.Rva;
             uint threadId = br.ReadUInt32();
@@ -93,7 +93,7 @@ public static class MinidumpReader
         }
         catch (Exception e)
         {
-            return new DumpAnalysis { Error = $"Dump konnte nicht gelesen werden: {e.Message}" };
+            return new DumpAnalysis { Error = Localization.L.F("Dump konnte nicht gelesen werden: {0}", e.Message) };
         }
     }
 

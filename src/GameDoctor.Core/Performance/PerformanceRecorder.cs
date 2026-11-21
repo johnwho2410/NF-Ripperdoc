@@ -124,7 +124,7 @@ public sealed class PerformanceRecorder : IDisposable
         var exe = PresentMonTool.Find();
         if (exe is null)
         {
-            _rec.PresentMonError = "PresentMon ist nicht installiert – es werden nur Sensoren aufgezeichnet.";
+            _rec.PresentMonError = Localization.L.T("PresentMon ist nicht installiert – es werden nur Sensoren aufgezeichnet.");
             return;
         }
 
@@ -159,7 +159,7 @@ public sealed class PerformanceRecorder : IDisposable
         }
         catch (Exception ex)
         {
-            _rec.PresentMonError = "PresentMon konnte nicht gestartet werden: " + ex.Message;
+            _rec.PresentMonError = Localization.L.F("PresentMon konnte nicht gestartet werden: {0}", ex.Message);
         }
     }
 

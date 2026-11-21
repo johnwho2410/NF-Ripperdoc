@@ -1,0 +1,16 @@
+{
+  "Grafikspeicher voll": "Video memory full",
+  "{0:F1} von {1:F1} GB belegt – Texturen werden nachgeladen. Texturqualität oder Raytracing senken.": "{0:F1} of {1:F1} GB in use – textures are being streamed in. Lower texture quality or ray tracing.",
+  "Arbeitsspeicher fast voll": "Memory almost full",
+  "{0:F1} von {1:F0} GB – Windows lagert aus. Browser, Discord & Co. schließen.": "{0:F1} of {1:F0} GB – Windows is paging. Close your browser, Discord and similar.",
+  "Virtueller Speicher knapp": "Virtual memory running low",
+  "{0:F0} von {1:F0} GB zugesagt – Absturzgefahr. Auslagerungsdatei vergrößern oder Programme schließen.": "{0:F0} of {1:F0} GB committed – risk of crashing. Enlarge the page file or close programs.",
+  "Ruckler-Serie": "Stutter streak",
+  "{0} Ruckler in 10 Sekunden.": "{0} stutters in 10 seconds.",
+  "Bildrate unter 30": "Frame rate below 30",
+  "Seit über 10 Sekunden nur {0:F0} FPS": "Only {0:F0} FPS for more than 10 seconds",
+  "Grafikkarte sehr warm": "Graphics card very hot",
+  "{0:F0} °C – ab etwa 83 °C taktet die Karte herunter. Lüfter und Gehäusebelüftung prüfen.": "{0:F0} °C – from about 83 °C the card clocks down. Check the fans and case airflow.",
+  "Flaschenhals jetzt: {0}": "Bottleneck now: {0}",
+  "Vorher {0}, seit 15 Sekunden durchgehend {1}.": "Previously {0}, continuously {1} for 15 seconds."
+}

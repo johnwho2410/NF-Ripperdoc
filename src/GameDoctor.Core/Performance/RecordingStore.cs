@@ -31,7 +31,7 @@ public static class RecordingStore
         using var fs = File.OpenRead(path);
         using Stream s = path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) ? new GZipStream(fs, CompressionMode.Decompress) : fs;
         return JsonSerializer.Deserialize<PerformanceRecording>(s, Json)
-               ?? throw new InvalidDataException("Aufnahme konnte nicht gelesen werden.");
+               ?? throw new InvalidDataException(Localization.L.T("Aufnahme konnte nicht gelesen werden."));
     }
 
     public static string? Latest() =>

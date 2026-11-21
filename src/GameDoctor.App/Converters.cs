@@ -1,3 +1,4 @@
+using GameDoctor.Core.Localization;
 using System.Collections;
 using System.Globalization;
 using System.Windows;
@@ -10,12 +11,13 @@ namespace GameDoctor.App;
 /// <summary>Farbe je Schweregrad.</summary>
 public sealed class SeverityBrushConverter : IValueConverter
 {
-    private static readonly Brush Critical = Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0x4D, 0x5E)));
-    private static readonly Brush Warning = Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x1C)));
-    private static readonly Brush Hint = Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0xD6, 0x0A)));
-    private static readonly Brush Info = Freeze(new SolidColorBrush(Color.FromRgb(0x5B, 0x9B, 0xD5)));
+    // Statusfarben des Designs: status-critical, status-warning, status-info, status-success
+    private static readonly Brush Critical = Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x4D)));
+    private static readonly Brush Warning = Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x00)));
+    private static readonly Brush Hint = Freeze(new SolidColorBrush(Color.FromRgb(0x00, 0xE5, 0xFF)));
+    private static readonly Brush Info = Freeze(new SolidColorBrush(Color.FromRgb(0x55, 0xB8, 0xFF)));
     /// <summary>Grün für „erledigt / geholfen“.</summary>
-    public static readonly Brush Good = Freeze(new SolidColorBrush(Color.FromRgb(0x4A, 0xDE, 0x80)));
+    public static readonly Brush Good = Freeze(new SolidColorBrush(Color.FromRgb(0x20, 0xD6, 0xA0)));
 
     private static Brush Freeze(Brush b) { b.Freeze(); return b; }
 
@@ -37,9 +39,9 @@ public sealed class SeverityLabelConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
     {
-        Severity.Critical => "KRITISCH",
-        Severity.Warning => "WARNUNG",
-        Severity.Hint => "HINWEIS",
+        Severity.Critical => L.T("KRITISCH"),
+        Severity.Warning => L.T("WARNUNG"),
+        Severity.Hint => L.T("HINWEIS"),
         _ => "INFO",
     };
 

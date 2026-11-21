@@ -44,7 +44,7 @@ public static class PresentMonTool
 
         var hash = Convert.ToHexString(SHA256.HashData(bytes));
         if (!hash.Equals(Sha256, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Die heruntergeladene PresentMon-Datei hat eine unerwartete Prüfsumme und wurde verworfen.");
+            throw new InvalidOperationException(Localization.L.T("Die heruntergeladene PresentMon-Datei hat eine unerwartete Prüfsumme und wurde verworfen."));
 
         await File.WriteAllBytesAsync(temp, bytes, ct);
         File.Move(temp, target, overwrite: true);

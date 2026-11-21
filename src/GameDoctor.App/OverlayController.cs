@@ -11,7 +11,7 @@ namespace GameDoctor.App;
 /// </summary>
 public sealed class OverlayController : IDisposable
 {
-    public const string HotkeyText = "Strg+Umschalt+O";
+    public static string HotkeyText => GameDoctor.Core.Localization.L.T("Strg+Umschalt+O");
 
     private readonly Window _owner;
     private OverlayWindow? _overlay;
@@ -80,8 +80,7 @@ public sealed class OverlayController : IDisposable
     /// <summary>Prüft anhand des Fenstermodus, ob das Overlay über dem Spiel überhaupt sichtbar sein kann.</summary>
     public static string? WindowModeProblem(string? windowMode) =>
         windowMode is "Fullscreen"
-            ? "Cyberpunk läuft im exklusiven Vollbild. Dort kann kein Programm etwas über das Spiel legen, ohne in das Spiel einzugreifen. " +
-              "Stell im Spiel unter Grafik → Fenstermodus auf „Randloses Fenster“ – das kostet praktisch keine Leistung."
+            ? GameDoctor.Core.Localization.L.T("Cyberpunk läuft im exklusiven Vollbild. Dort kann kein Programm etwas über das Spiel legen, ohne in das Spiel einzugreifen. Stell im Spiel unter Grafik → Fenstermodus auf „Randloses Fenster“ – das kostet praktisch keine Leistung.")
             : null;
 
     // ------------------------------------------------------------------ globales Tastenkürzel

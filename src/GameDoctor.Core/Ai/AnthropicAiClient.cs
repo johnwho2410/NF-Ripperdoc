@@ -1,3 +1,4 @@
+using GameDoctor.Core.Localization;
 using System.Runtime.CompilerServices;
 using Anthropic;
 using Anthropic.Exceptions;
@@ -91,8 +92,7 @@ public sealed class AnthropicAiClient : AiClient
                 }
                 else if (ev.TryPickDelta(out var md) && md.Delta.StopReason == "refusal")
                 {
-                    throw new AiException("Claude hat die Auswertung abgelehnt (Sicherheitsfilter). " +
-                                          "Versuch es mit weniger Daten (z. B. ohne Mod-Logs) oder über einen anderen Anbieter.");
+                    throw new AiException(L.T("Claude hat die Auswertung abgelehnt (Sicherheitsfilter). Versuch es mit weniger Daten (z. B. ohne Mod-Logs) oder über einen anderen Anbieter."));
                 }
             }
         }
@@ -101,28 +101,28 @@ public sealed class AnthropicAiClient : AiClient
             await stream.DisposeAsync();
         }
         if (!any)
-            throw new AiException("Claude hat eine leere Antwort geschickt. Bitte nochmal versuchen.");
+            throw new AiException(L.T("Claude hat eine leere Antwort geschickt. Bitte nochmal versuchen."));
     }
 
     private AiException Translate(Exception e) => e switch
     {
         AiException a => a,
         AnthropicUnauthorizedException or AnthropicForbiddenException =>
-            new AiException("Der API-Key wurde von Anthropic abgelehnt. Bitte in den KI-Einstellungen prüfen.", e),
+            new AiException(L.T("Der API-Key wurde von Anthropic abgelehnt. Bitte in den KI-Einstellungen prüfen."), e),
         AnthropicNotFoundException =>
-            new AiException($"Modell „{Model}“ nicht gefunden. Über „Modelle laden“ ein verfügbares Modell auswählen.", e),
+            new AiException(L.F("Modell „{0}“ nicht gefunden. Über „Modelle laden“ ein verfügbares Modell auswählen.", Model), e),
         AnthropicRateLimitException =>
-            new AiException("Zu viele Anfragen an Anthropic. Kurz warten und nochmal versuchen.", e),
+            new AiException(L.T("Zu viele Anfragen an Anthropic. Kurz warten und nochmal versuchen."), e),
         AnthropicBadRequestException when e.Message.Contains("credit", StringComparison.OrdinalIgnoreCase) =>
-            new AiException("Dein Anthropic-Guthaben reicht nicht. Unter platform.claude.com → Billing aufladen.", e),
+            new AiException(L.T("Dein Anthropic-Guthaben reicht nicht. Unter platform.claude.com → Billing aufladen."), e),
         AnthropicBadRequestException =>
-            new AiException("Anthropic hat die Anfrage abgelehnt: " + e.Message, e),
+            new AiException(L.F("Anthropic hat die Anfrage abgelehnt: {0}", e.Message), e),
         Anthropic5xxException =>
-            new AiException("Anthropic hat gerade ein Problem. Später nochmal versuchen.", e),
+            new AiException(L.T("Anthropic hat gerade ein Problem. Später nochmal versuchen."), e),
         AnthropicIOException or HttpRequestException =>
-            new AiException("Keine Verbindung zu Anthropic. Internetverbindung prüfen.", e),
+            new AiException(L.T("Keine Verbindung zu Anthropic. Internetverbindung prüfen."), e),
         AnthropicApiException =>
-            new AiException("Anfrage an Anthropic fehlgeschlagen: " + e.Message, e),
-        _ => new AiException("Unerwarteter Fehler: " + e.Message, e),
+            new AiException(L.F("Anfrage an Anthropic fehlgeschlagen: {0}", e.Message), e),
+        _ => new AiException(L.F("Unerwarteter Fehler: {0}", e.Message), e),
     };
 }

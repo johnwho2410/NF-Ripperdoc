@@ -27,6 +27,15 @@ public sealed record AiProviderPreset(
 
 public static class AiProviders
 {
+    // Name und Hinweis werden erst bei der Anzeige übersetzt (L.T(preset.Name) / L.T(preset.Hint)).
+    // i18n: "Ollama (lokal)"
+    // i18n: "LM Studio (lokal)"
+    // i18n: "Anderer Dienst"
+    // i18n: "Ein Konto für viele Modelle (Gemini, Claude, GPT …). Key unter openrouter.ai/keys erstellen. Eine Auswertung kostet meist nur Cent-Beträge."
+    // i18n: "Direkt bei Anthropic. Key unter platform.claude.com → Settings → API Keys erstellen (beginnt mit sk-ant-). Das API-Guthaben ist getrennt von einem Claude-Abo und wird dort unter „Billing“ aufgeladen."
+    // i18n: "Läuft komplett auf deinem PC, kein Konto nötig. Ollama muss gestartet sein und ein Modell geladen haben (z. B. „ollama pull qwen3“)."
+    // i18n: "Läuft komplett auf deinem PC, kein Konto nötig. In LM Studio unter „Developer“ den lokalen Server starten."
+    // i18n: "Jeder Dienst mit OpenAI-kompatibler Schnittstelle (…/v1/chat/completions), z. B. OpenAI, Google Gemini, Groq oder ein eigener Server."
     public static readonly IReadOnlyList<AiProviderPreset> All =
     [
         new("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", "google/gemini-2.5-flash", NeedsKey: true, IsLocal: false,

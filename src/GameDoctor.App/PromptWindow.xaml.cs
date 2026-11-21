@@ -1,3 +1,4 @@
+using GameDoctor.Core.Localization;
 using System.IO;
 using System.Text;
 using System.Windows;
@@ -31,8 +32,8 @@ public partial class PromptWindow : Window
         if (!CbPerf.IsEnabled) CbPerf.IsChecked = false;
         var shown = focus ?? result.Crashes.FirstOrDefault();
         FocusText.Text = shown is null
-            ? "Keine Abstürze im gewählten Zeitraum."
-            : $"Im Detail: Absturz vom {shown.Report.Time:dd.MM.yyyy HH:mm} ({shown.FaultLabel}) · dazu die übrigen {Math.Min(10, Math.Max(0, result.Crashes.Count - 1))} neuesten Abstürze";
+            ? L.T("Keine Abstürze im gewählten Zeitraum.")
+            : L.F("Im Detail: Absturz vom {0:g} ({1}) · dazu die übrigen {2} neuesten Abstürze", shown.Report.Time, shown.FaultLabel, Math.Min(10, Math.Max(0, result.Crashes.Count - 1)));
         SourceInitialized += (_, _) => DarkTitleBar.Apply(this);
         Closing += (_, _) => _cts?.Cancel();
         _ready = true;
@@ -74,13 +75,13 @@ public partial class PromptWindow : Window
     {
         if (ShowingAnswer)
         {
-            InfoText.Text = AnswerBox.Text.Length == 0 ? "Noch keine Antwort – „Mit KI auswerten“ klicken." : "";
+            InfoText.Text = AnswerBox.Text.Length == 0 ? L.T("Noch keine Antwort – „Mit KI auswerten“ klicken.") : "";
             return;
         }
         // Grobe Faustregel: ~4 Zeichen pro Token
         var s = AiSettings.Load();
-        var target = s.IsConfigured ? $" · Auswertung über {s.Provider.Name} ({s.EffectiveModel})" : "";
-        InfoText.Text = $"{PromptBox.Text.Length:N0} Zeichen (ca. {PromptBox.Text.Length / 4:N0} Tokens){target}";
+        var target = s.IsConfigured ? " · " + L.F("Auswertung über {0} ({1})", L.T(s.Provider.Name), s.EffectiveModel) : "";
+        InfoText.Text = L.F("{0:N0} Zeichen (ca. {1:N0} Tokens)", PromptBox.Text.Length, PromptBox.Text.Length / 4) + target;
     }
 
     private async void Ask_Click(object sender, RoutedEventArgs e)
@@ -103,14 +104,14 @@ public partial class PromptWindow : Window
                 $"und dort vom Modell „{settings.EffectiveModel}“ ausgewertet.\n\n" +
                 (CbAnonymize.IsChecked == true ? "Benutzername, PC-Name und persönliche Pfade sind entfernt." : "Achtung: „Anonymisieren“ ist ausgeschaltet.") +
                 "\n\nJetzt senden?",
-                "Mit KI auswerten", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                L.T("Mit KI auswerten"), MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (ok != MessageBoxResult.Yes) return;
         }
 
         ViewAnswer.IsChecked = true;
         AnswerBox.Clear();
         SetBusy(true);
-        InfoText.Text = $"{settings.Provider.Name} ({settings.EffectiveModel}) denkt nach …";
+        InfoText.Text = L.F("{0} ({1}) denkt nach …", L.T(settings.Provider.Name), settings.EffectiveModel);
         _cts = new CancellationTokenSource();
         bool gotText = false;
         try
@@ -118,21 +119,21 @@ public partial class PromptWindow : Window
             using var client = AiClient.Create(settings);
             await foreach (var part in client.StreamChatAsync([AiMessage.User(prompt)], _cts.Token))
             {
-                if (!gotText) { gotText = true; InfoText.Text = $"{settings.Provider.Name} ({settings.EffectiveModel}) antwortet …"; }
+                if (!gotText) { gotText = true; InfoText.Text = L.F("{0} ({1}) antwortet …", L.T(settings.Provider.Name), settings.EffectiveModel); }
                 AnswerBox.AppendText(part);
                 AnswerBox.ScrollToEnd();
             }
-            InfoText.Text = $"Fertig · {settings.Provider.Name} ({settings.EffectiveModel}). KI-Antworten können falsch sein – Schritte bitte einzeln ausprobieren.";
+            InfoText.Text = L.F("Fertig · {0} ({1}). KI-Antworten können falsch sein – Schritte bitte einzeln ausprobieren.", L.T(settings.Provider.Name), settings.EffectiveModel);
         }
         catch (OperationCanceledException)
         {
-            InfoText.Text = "Abgebrochen.";
+            InfoText.Text = L.T("Abgebrochen.");
         }
         catch (AiException ex)
         {
             if (gotText) AnswerBox.AppendText("\n\n");
             AnswerBox.AppendText("⚠ " + ex.Message);
-            InfoText.Text = "Die Auswertung ist fehlgeschlagen.";
+            InfoText.Text = L.T("Die Auswertung ist fehlgeschlagen.");
         }
         finally
         {
@@ -145,7 +146,7 @@ public partial class PromptWindow : Window
     private void SetBusy(bool busy)
     {
         AskButton.IsEnabled = !busy;
-        AskButton.Content = busy ? "Läuft …" : "Mit KI auswerten";
+        AskButton.Content = busy ? L.T("Läuft …") : L.T("Mit KI auswerten");
         StopButton.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         OptionsPanel.IsEnabled = !busy;
     }
@@ -164,7 +165,7 @@ public partial class PromptWindow : Window
     {
         if (CurrentText.Length == 0) return;
         Clipboard.SetText(CurrentText);
-        InfoText.Text = ShowingAnswer ? "Antwort kopiert." : "Kopiert! Jetzt einfach im KI-Chat einfügen (Strg+V).";
+        InfoText.Text = ShowingAnswer ? L.T("Antwort kopiert.") : L.T("Kopiert! Jetzt einfach im KI-Chat einfügen (Strg+V).");
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
@@ -172,12 +173,12 @@ public partial class PromptWindow : Window
         if (CurrentText.Length == 0) return;
         var dlg = new SaveFileDialog
         {
-            Title = ShowingAnswer ? "KI-Antwort speichern" : "Prompt speichern",
-            Filter = ShowingAnswer ? "Markdown (*.md)|*.md|Textdatei (*.txt)|*.txt" : "Textdatei (*.txt)|*.txt",
-            FileName = ShowingAnswer ? $"gamedoctor-ki-auswertung-{DateTime.Now:yyyy-MM-dd}.md" : $"gamedoctor-prompt-{DateTime.Now:yyyy-MM-dd}.txt",
+            Title = ShowingAnswer ? L.T("KI-Antwort speichern") : L.T("Prompt speichern"),
+            Filter = ShowingAnswer ? L.T("Markdown (*.md)|*.md|Textdatei (*.txt)|*.txt") : L.T("Textdatei (*.txt)|*.txt"),
+            FileName = ShowingAnswer ? L.F("gamedoctor-ki-auswertung-{0:yyyy-MM-dd}.md", DateTime.Now) : L.F("gamedoctor-prompt-{0:yyyy-MM-dd}.txt", DateTime.Now),
         };
         if (dlg.ShowDialog(this) != true) return;
         File.WriteAllText(dlg.FileName, CurrentText, Encoding.UTF8);
-        InfoText.Text = "Gespeichert: " + dlg.FileName;
+        InfoText.Text = L.F("Gespeichert: {0}", dlg.FileName);
     }
 }

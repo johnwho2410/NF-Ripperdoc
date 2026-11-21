@@ -12,6 +12,9 @@ public sealed record Skin(string Id, string Name, string File, string Descriptio
 /// </summary>
 public static class ThemeManager
 {
+    // Name/Beschreibung werden beim Anzeigen übersetzt:
+    // i18n: "Neongelb und Cyan, abgeschrägte Ecken – passend zu Cyberpunk 2077"
+    // i18n: "Ruhiges, dunkles Design ohne Spielbezug"
     public static readonly IReadOnlyList<Skin> Skins =
     [
         new("cyberpunk", "Night City", "Themes/Cyberpunk.xaml", "Neongelb und Cyan, abgeschrägte Ecken – passend zu Cyberpunk 2077"),

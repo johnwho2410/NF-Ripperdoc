@@ -1,66 +1,55 @@
 <!--
-    Skin „Night City“ für Cyberpunk 2077: Neongelb und Cyan, abgeschrägte Ecken, feine Scanlines,
-    schmale technische Schrift. Eigenständig gestaltet – bewusst ohne Logos, Schriften oder Grafiken
-    von CD PROJEKT RED.
+    Skin „NF-RIPPERDOC / Night City“ für Cyberpunk 2077: dunkle, leicht bläuliche Flächen, Neongelb für Aktionen,
+    Cyan für technische Informationen, sparsame abgeschrägte Ecken. Form follows function: lesbar zuerst, Dekor danach.
+    Eigenständig gestaltet – bewusst ohne Logos, Schriften oder Grafiken von CD PROJEKT RED.
+    Alle Farben und Maße des Designs stehen nur hier (Design-Tokens); die Oberfläche bindet sie per DynamicResource.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
-    <!-- Farben -->
-    <Color x:Key="BgColor">#0A0B0F</Color>
-    <Color x:Key="PanelColor">#13151C</Color>
-    <Color x:Key="PanelHiColor">#1C1F29</Color>
-    <Color x:Key="LineColor">#2B2F3B</Color>
-    <Color x:Key="TextColor">#ECEEF2</Color>
-    <Color x:Key="MutedColor">#8A93A6</Color>
-    <Color x:Key="AccentColor">#FCEE0A</Color>
-    <Color x:Key="CyanColor">#00E0F0</Color>
+    <!-- Farben (Tokens) -->
+    <Color x:Key="BgColor">#0B1118</Color>          <!-- bg-primary: Hauptfenster -->
+    <Color x:Key="PanelColor">#111A23</Color>       <!-- bg-secondary: Panels und Karten -->
+    <Color x:Key="PanelHiColor">#172330</Color>     <!-- bg-elevated: hervorgehobene Flächen -->
+    <Color x:Key="LineColor">#263747</Color>        <!-- border-default -->
+    <Color x:Key="TextColor">#E6EDF5</Color>        <!-- text-primary -->
+    <Color x:Key="MutedColor">#9DAFC2</Color>       <!-- text-secondary -->
+    <Color x:Key="AccentColor">#FFF200</Color>      <!-- accent-primary: Primäraktionen, Fokus, aktive Navigation -->
+    <Color x:Key="CyanColor">#00E5FF</Color>        <!-- accent-secondary: technische Informationen -->
 
     <SolidColorBrush x:Key="Bg" Color="{StaticResource BgColor}"/>
-    <!-- Fensterhintergrund mit feinen, kaum sichtbaren Scanlines -->
-    <DrawingBrush x:Key="WindowBackdrop" TileMode="Tile" Stretch="None"
-                  Viewport="0,0,4,3" ViewportUnits="Absolute" Viewbox="0,0,4,3" ViewboxUnits="Absolute">
-        <DrawingBrush.Drawing>
-            <DrawingGroup>
-                <GeometryDrawing Brush="{StaticResource Bg}">
-                    <GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,4,3"/></GeometryDrawing.Geometry>
-                </GeometryDrawing>
-                <GeometryDrawing Brush="#0AFCEE0A">
-                    <GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,4,1"/></GeometryDrawing.Geometry>
-                </GeometryDrawing>
-            </DrawingGroup>
-        </DrawingBrush.Drawing>
-    </DrawingBrush>
+    <!-- Ruhiger Fensterhintergrund, keine Scanlines -->
+    <SolidColorBrush x:Key="WindowBackdrop" Color="{StaticResource BgColor}"/>
     <SolidColorBrush x:Key="Panel" Color="{StaticResource PanelColor}"/>
     <SolidColorBrush x:Key="PanelHi" Color="{StaticResource PanelHiColor}"/>
-    <SolidColorBrush x:Key="PanelEdge" Color="#2E2C17"/>
+    <SolidColorBrush x:Key="PanelEdge" Color="{StaticResource LineColor}"/>
     <SolidColorBrush x:Key="Line" Color="{StaticResource LineColor}"/>
     <SolidColorBrush x:Key="Text" Color="{StaticResource TextColor}"/>
-    <SolidColorBrush x:Key="TextSoft" Color="#C9CEDA"/>
+    <SolidColorBrush x:Key="TextSoft" Color="#C3CFDC"/>
     <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource MutedColor}"/>
     <SolidColorBrush x:Key="Accent" Color="{StaticResource AccentColor}"/>
-    <SolidColorBrush x:Key="OnAccent" Color="#0A0B0F"/>
+    <SolidColorBrush x:Key="OnAccent" Color="#0B1118"/>
     <SolidColorBrush x:Key="Cyan" Color="{StaticResource CyanColor}"/>
-    <SolidColorBrush x:Key="Good" Color="#4ADE80"/>
-    <SolidColorBrush x:Key="RecommendBg" Color="#0F2A22"/>
-    <SolidColorBrush x:Key="RecommendText" Color="#B8F5D8"/>
-    <SolidColorBrush x:Key="BusyOverlay" Color="#E00A0B0F"/>
+    <SolidColorBrush x:Key="Good" Color="#20D6A0"/>                 <!-- status-success -->
+    <SolidColorBrush x:Key="RecommendBg" Color="#0C1F27"/>
+    <SolidColorBrush x:Key="RecommendText" Color="#9FF3EC"/>
+    <SolidColorBrush x:Key="BusyOverlay" Color="#E00B1118"/>
     <SolidColorBrush x:Key="ChartLine" Color="{StaticResource CyanColor}"/>
     <!-- Halbtransparenter Hintergrund des Ingame-Overlays -->
-    <SolidColorBrush x:Key="OverlayBg" Color="#D813151C"/>
+    <SolidColorBrush x:Key="OverlayBg" Color="#D8111A23"/>
     <SolidColorBrush x:Key="EdgeAccent" Color="{StaticResource AccentColor}"/>
 
-    <!-- Formen: eckig mit abgeschrägten Ecken -->
+    <!-- Formen: eckig, nur eine kleine abgeschrägte Ecke als Markenmerkmal -->
     <sys:Double x:Key="ShapeCorner">0</sys:Double>
     <sys:Double x:Key="ShapeCornerSmall">0</sys:Double>
-    <sys:Double x:Key="ShapeChamfer">14</sys:Double>
-    <sys:Double x:Key="ShapeChamferSmall">7</sys:Double>
+    <sys:Double x:Key="ShapeChamfer">10</sys:Double>
+    <sys:Double x:Key="ShapeChamferSmall">5</sys:Double>
     <sys:Double x:Key="PanelEdgeThickness">1</sys:Double>
-    <CornerRadius x:Key="CornerS">0</CornerRadius>
-    <CornerRadius x:Key="CornerL">0</CornerRadius>
+    <CornerRadius x:Key="CornerS">2</CornerRadius>
+    <CornerRadius x:Key="CornerL">2</CornerRadius>
 
-    <!-- Schriften: Bahnschrift ist bei Windows 10/11 dabei -->
-    <FontFamily x:Key="BodyFont">Bahnschrift, Segoe UI</FontFamily>
-    <FontFamily x:Key="HeadFont">Bahnschrift SemiCondensed, Bahnschrift, Segoe UI</FontFamily>
-    <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas, Segoe UI</FontFamily>
+    <!-- Schriften: Inter / JetBrains Mono, falls installiert; sonst Windows-Systemschriften -->
+    <FontFamily x:Key="BodyFont">Inter, Segoe UI</FontFamily>
+    <FontFamily x:Key="HeadFont">Inter, Segoe UI</FontFamily>
+    <FontFamily x:Key="MonoFont">JetBrains Mono, Cascadia Mono, Consolas</FontFamily>
 </ResourceDictionary>

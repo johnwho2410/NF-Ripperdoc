@@ -13,4 +13,9 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Englische Übersetzungen („Deutsch“ → „English“), je Bereich eine Datei -->
+    <EmbeddedResource Include="Localization\en\*.json" />
+  </ItemGroup>
+
 </Project>

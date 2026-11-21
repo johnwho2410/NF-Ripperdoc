@@ -1,6 +1,7 @@
 using System.Text.Json;
 using GameDoctor.Core.Dump;
 using GameDoctor.Core.Games.Cyberpunk;
+using GameDoctor.Core.Localization;
 using GameDoctor.Core.Platform;
 
 namespace GameDoctor.Core.Analysis;
@@ -44,12 +45,12 @@ public sealed class CrashAnalyzerOptions
     public int Days { get; init; } = 30;
 }
 
-/// <summary>Führt alle Datenquellen zusammen und wendet die Diagnoseregeln an.</summary>
+/// <summary>Führt alle Datenquellen zusammen und wendet die Diagnoseregeln an. Alle Texte laufen über <see cref="L"/>.</summary>
 public static class CrashAnalyzer
 {
     public static AnalysisResult Run(CrashAnalyzerOptions options, Action<string>? progress = null)
     {
-        progress?.Invoke("Suche Spiel und Mod-Manager …");
+        progress?.Invoke(L.T("Suche Spiel und Mod-Manager …"));
         var paths = PathSettings.Load();
         var probes = new List<LocateProbe>();
         var install = options.GamePath is not null
@@ -67,15 +68,15 @@ public static class CrashAnalyzer
         };
         var since = DateTime.Now.AddDays(-options.Days);
 
-        progress?.Invoke("Lese Windows-Ereignisanzeige …");
+        progress?.Invoke(L.T("Lese Windows-Ereignisanzeige …"));
         result.SystemEvents = WindowsEventScanner.Scan("Cyberpunk2077.exe", TimeSpan.FromDays(options.Days));
 
-        progress?.Invoke("Lese Crashreports …");
+        progress?.Invoke(L.T("Lese Crashreports …"));
         var reports = RedCrashReport.LoadAll(options.QueueDir).Where(r => r.Time >= since).ToList();
         int i = 0;
         foreach (var report in reports)
         {
-            progress?.Invoke($"Analysiere Absturz {++i}/{reports.Count}: {report.Time:dd.MM. HH:mm}");
+            progress?.Invoke(L.F("Analysiere Absturz {0}/{1}: {2:dd.MM. HH:mm}", ++i, reports.Count, report.Time));
             var dump = report.DumpPath is not null ? MinidumpReader.Analyze(report.DumpPath) : null;
             var c = new CrashCase { Report = report, Dump = dump };
             ApplyCrashRules(c, classifier, result.SystemEvents);
@@ -84,7 +85,7 @@ public static class CrashAnalyzer
 
         if (install is not null)
         {
-            progress?.Invoke("Lese Mod-Logs …");
+            progress?.Invoke(L.T("Lese Mod-Logs …"));
             result.ModLogs = new ModLogScanner(install, inventory.ExtraRoots).Scan();
         }
 
@@ -114,7 +115,7 @@ public static class CrashAnalyzer
         else if (d is not null && d.Error is null)
         {
             c.FaultKind = ModuleKind.Unknown;
-            c.FaultLabel = $"keinem Modul zuordenbar (Adresse 0x{d.ExceptionAddress:X})";
+            c.FaultLabel = L.F("keinem Modul zuordenbar (Adresse 0x{0:X})", d.ExceptionAddress);
             c.Signature = $"<kein Modul>:{d.ExceptionCode:X8}";
         }
 
@@ -137,11 +138,11 @@ public static class CrashAnalyzer
         if (c.FaultKind is ModuleKind.Mod or ModuleKind.ModFramework)
         {
             c.Findings.Add(new Finding(Severity.Critical,
-                $"Absturz direkt in der Mod „{c.FaultLabel}“",
-                $"Der abstürzende Code liegt in {classifier.ResolvePath(d!.FaultingModule!)} (Version {d.FaultingModule!.FileVersion ?? "?"}). {exceptionText}",
+                L.F("Absturz direkt in der Mod „{0}“", c.FaultLabel),
+                L.F("Der abstürzende Code liegt in {0} (Version {1}). {2}", classifier.ResolvePath(d!.FaultingModule!), d.FaultingModule!.FileVersion ?? "?", exceptionText),
                 c.FaultKind == ModuleKind.ModFramework
-                    ? "Framework (RED4ext/CET/ArchiveXL …) auf die neueste Version für deine Spielversion aktualisieren. Prüfen, ob ein Spiel-Update kürzlich kam – Frameworks brauchen dann meist ein Update."
-                    : "Diese Mod aktualisieren oder testweise deaktivieren. Prüfen, ob sie zur aktuellen Spielversion passt und ihre Abhängigkeiten (RED4ext, Codeware, ArchiveXL, TweakXL) aktuell sind.")
+                    ? L.T("Framework (RED4ext/CET/ArchiveXL …) auf die neueste Version für deine Spielversion aktualisieren. Prüfen, ob ein Spiel-Update kürzlich kam – Frameworks brauchen dann meist ein Update.")
+                    : L.T("Diese Mod aktualisieren oder testweise deaktivieren. Prüfen, ob sie zur aktuellen Spielversion passt und ihre Abhängigkeiten (RED4ext, Codeware, ArchiveXL, TweakXL) aktuell sind."))
             { Category = "Ursache" });
         }
         // R2: Grafiktreiber
@@ -160,17 +161,17 @@ public static class CrashAnalyzer
                     _ => "Intel XeSS",
                 };
                 c.Findings.Add(new Finding(Severity.Critical,
-                    $"Absturz im Grafiktreiber, ausgelöst durch {tech}",
-                    $"Der Treiber ({c.FaultLabel}) stürzte ab, während {tech} ({upscaler}) ihn aufrief. {exceptionText}",
-                    $"{tech} testweise ausschalten bzw. auf ein anderes Upscaling umstellen. Wurde die DLSS-DLL manuell ersetzt (z. B. DLSS Swapper), die Originaldatei wiederherstellen. Grafiktreiber aktualisieren oder sauber neu installieren.")
+                    L.F("Absturz im Grafiktreiber, ausgelöst durch {0}", tech),
+                    L.F("Der Treiber ({0}) stürzte ab, während {1} ({2}) ihn aufrief. {3}", c.FaultLabel, tech, upscaler, exceptionText),
+                    L.F("{0} testweise ausschalten bzw. auf ein anderes Upscaling umstellen. Wurde die DLSS-DLL manuell ersetzt (z. B. DLSS Swapper), die Originaldatei wiederherstellen. Grafiktreiber aktualisieren oder sauber neu installieren.", tech))
                 { Category = "Ursache" });
                 goto afterFault;
             }
 
             c.Findings.Add(new Finding(Severity.Critical,
-                $"Absturz im Grafiktreiber ({c.FaultLabel})",
-                $"Der Fehler trat im Grafiktreiber auf. {exceptionText} Häufige Ursachen: instabile GPU-Übertaktung/Undervolting, voller VRAM, fehlerhafte Treiberversion oder Overlays.",
-                "Übertaktung/Undervolt der GPU testweise zurücksetzen, Treiber sauber neu installieren (oder eine Vorgängerversion testen), Raytracing/Pathtracing testweise ausschalten.")
+                L.F("Absturz im Grafiktreiber ({0})", c.FaultLabel),
+                L.F("Der Fehler trat im Grafiktreiber auf. {0} Häufige Ursachen: instabile GPU-Übertaktung/Undervolting, voller VRAM, fehlerhafte Treiberversion oder Overlays.", exceptionText),
+                L.T("Übertaktung/Undervolt der GPU testweise zurücksetzen, Treiber sauber neu installieren (oder eine Vorgängerversion testen), Raytracing/Pathtracing testweise ausschalten."))
             { Category = "Ursache" });
         }
         // R3: Overlay
@@ -179,9 +180,9 @@ public static class CrashAnalyzer
             var faultPath = classifier.ResolvePath(d!.FaultingModule!);
             var product = ModuleClassifier.OverlayProduct(faultPath) ?? c.FaultLabel;
             c.Findings.Add(new Finding(Severity.Critical,
-                $"Absturz in einem Overlay ({product})",
-                $"Der Fehler trat in {faultPath} auf – einem Programm, das sich ins Spiel einklinkt. {exceptionText}",
-                $"{product} für Cyberpunk deaktivieren und erneut testen.")
+                L.F("Absturz in einem Overlay ({0})", product),
+                L.F("Der Fehler trat in {0} auf – einem Programm, das sich ins Spiel einklinkt. {1}", faultPath, exceptionText),
+                L.F("{0} für Cyberpunk deaktivieren und erneut testen.", product))
             { Category = "Ursache" });
         }
         // R4: Engine/Windows – Indizien vom Stack
@@ -190,70 +191,70 @@ public static class CrashAnalyzer
             var mods = c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.ModFramework or ModuleKind.Overlay).ToList();
             var where = c.FaultKind switch
             {
-                ModuleKind.GameExecutable => "in der Spiel-Engine (Cyberpunk2077.exe)",
-                ModuleKind.GameRuntime => $"in einer Spiel-Bibliothek ({c.FaultLabel})",
-                ModuleKind.System => $"in einer Windows-Komponente ({c.FaultLabel})",
-                _ => $"in {c.FaultLabel}",
+                ModuleKind.GameExecutable => L.T("in der Spiel-Engine (Cyberpunk2077.exe)"),
+                ModuleKind.GameRuntime => L.F("in einer Spiel-Bibliothek ({0})", c.FaultLabel),
+                ModuleKind.System => L.F("in einer Windows-Komponente ({0})", c.FaultLabel),
+                _ => L.F("in {0}", c.FaultLabel),
             };
             if (mods.Count > 0)
             {
                 c.Findings.Add(new Finding(Severity.Warning,
-                    $"Absturz {where} – Mods im Aufrufpfad gefunden",
-                    $"{exceptionText} Auf dem Stack des abstürzenden Threads liegen Rücksprungadressen in diesen Mods/Hooks. Das ist ein starkes Indiz, dass sie beteiligt waren (aber kein Beweis):",
-                    "Die oben genannten Mods zuerst aktualisieren bzw. testweise deaktivieren.",
-                    mods.Select(m => $"{m.Name} ({ModuleClassifier.KindLabel(m.Kind)}, {m.Hits}× auf dem Stack)").ToList())
+                    L.F("Absturz {0} – Mods im Aufrufpfad gefunden", where),
+                    L.F("{0} Auf dem Stack des abstürzenden Threads liegen Rücksprungadressen in diesen Mods/Hooks. Das ist ein starkes Indiz, dass sie beteiligt waren (aber kein Beweis):", exceptionText),
+                    L.T("Die oben genannten Mods zuerst aktualisieren bzw. testweise deaktivieren."),
+                    mods.Select(m => L.F("{0} ({1}, {2}× auf dem Stack)", m.Name, ModuleClassifier.KindLabel(m.Kind), m.Hits)).ToList())
                 { Category = "Ursache" });
             }
             else
             {
                 c.Findings.Add(new Finding(Severity.Info,
-                    $"Absturz {where}",
-                    $"{exceptionText} Auf dem Stack wurden keine Mods gefunden. Ohne Debug-Symbole von CD Projekt lässt sich die genaue Funktion nicht benennen – die Signatur {c.Signature} kann aber mit anderen Abstürzen verglichen werden.",
+                    L.F("Absturz {0}", where),
+                    L.F("{0} Auf dem Stack wurden keine Mods gefunden. Ohne Debug-Symbole von CD Projekt lässt sich die genaue Funktion nicht benennen – die Signatur {1} kann aber mit anderen Abstürzen verglichen werden.", exceptionText, c.Signature),
                     null)
                 { Category = "Ursache" });
             }
         }
         else if (d?.Error is { } err)
         {
-            c.Findings.Add(new Finding(Severity.Info, "Dump nicht auswertbar", err) { Category = "Ursache" });
+            c.Findings.Add(new Finding(Severity.Info, L.T("Dump nicht auswertbar"), err) { Category = "Ursache" });
         }
         afterFault:
 
         // R5: Speicher
         if (r.OutOfMemory)
-            c.Findings.Add(new Finding(Severity.Critical, "Die Engine meldet „Out of Memory“",
-                "Dem Spiel ist der Arbeitsspeicher ausgegangen.",
-                "Auslagerungsdatei auf „automatisch“ stellen und genug Platz auf C: lassen (≥ 20 GB). Speicherhungrige Mods (Texturpakete, Crowd-Mods) reduzieren. Hintergrundprogramme schließen.")
+            c.Findings.Add(new Finding(Severity.Critical, L.T("Die Engine meldet „Out of Memory“"),
+                L.T("Dem Spiel ist der Arbeitsspeicher ausgegangen."),
+                L.T("Auslagerungsdatei auf „automatisch“ stellen und genug Platz auf C: lassen (≥ 20 GB). Speicherhungrige Mods (Texturpakete, Crowd-Mods) reduzieren. Hintergrundprogramme schließen."))
             { Category = "Speicher" });
 
         if (r.VramUsedMb is int used && r.VramTotalMb is int total && total > 0 && used >= total * 0.92)
-            c.Findings.Add(new Finding(Severity.Warning, "Grafikspeicher (VRAM) fast voll",
-                $"Zum Absturzzeitpunkt waren {used} von {total} MB VRAM belegt ({100.0 * used / total:F0} %).",
-                "Texturqualität senken, Raytracing/Pathtracing reduzieren oder hochauflösende Texturmods entfernen.")
+            c.Findings.Add(new Finding(Severity.Warning, L.T("Grafikspeicher (VRAM) fast voll"),
+                L.F("Zum Absturzzeitpunkt waren {0} von {1} MB VRAM belegt ({2:F0} %).", used, total, 100.0 * used / total),
+                L.T("Texturqualität senken, Raytracing/Pathtracing reduzieren oder hochauflösende Texturmods entfernen."))
             { Category = "Speicher" });
 
         // R6: Zeitpunkt
         if (r.UptimeSeconds is int up && up < 90)
-            c.Findings.Add(new Finding(Severity.Warning, $"Absturz direkt nach dem Start ({up} s)",
-                "Abstürze in den ersten Sekunden deuten fast immer auf ein Problem beim Laden von Mods/Plugins hin (falsche Version, fehlende Abhängigkeit).",
-                "Mod-Logs (RED4ext, redscript, CET) prüfen – siehe Abschnitt „Mod-Umgebung“.")
+            c.Findings.Add(new Finding(Severity.Warning, L.F("Absturz direkt nach dem Start ({0} s)", up),
+                L.T("Abstürze in den ersten Sekunden deuten fast immer auf ein Problem beim Laden von Mods/Plugins hin (falsche Version, fehlende Abhängigkeit)."),
+                L.T("Mod-Logs (RED4ext, redscript, CET) prüfen – siehe Abschnitt „Mod-Umgebung“."))
             { Category = "Zeitpunkt" });
         else if (r.LoadingStage is { } stage && stage != "Finished")
-            c.Findings.Add(new Finding(Severity.Hint, $"Absturz während eines Ladevorgangs ({stage})",
-                "Das Spiel war noch beim Laden. Typisch für defekte Spielstände, Archive-Mods mit Fehlern oder Ressourcen-Konflikte.",
-                "Einen älteren Spielstand testen; ArchiveXL-Log auf Fehler prüfen.")
+            c.Findings.Add(new Finding(Severity.Hint, L.F("Absturz während eines Ladevorgangs ({0})", stage),
+                L.T("Das Spiel war noch beim Laden. Typisch für defekte Spielstände, Archive-Mods mit Fehlern oder Ressourcen-Konflikte."),
+                L.T("Einen älteren Spielstand testen; ArchiveXL-Log auf Fehler prüfen."))
             { Category = "Zeitpunkt" });
 
         // R7: GPU-Timeout um den Absturz herum
         if (c.NearbyEvents.Any(e => e.Kind == SystemEventKind.GpuTimeout))
-            c.Findings.Add(new Finding(Severity.Critical, "Grafiktreiber-Timeout (TDR) zum Absturzzeitpunkt",
-                "Windows hat den Grafiktreiber neu gestartet, weil die GPU nicht mehr reagierte.",
-                "GPU-Übertaktung/Undervolt zurücksetzen, Temperaturen prüfen, Treiber neu installieren, Netzteil als Ursache in Betracht ziehen.")
+            c.Findings.Add(new Finding(Severity.Critical, L.T("Grafiktreiber-Timeout (TDR) zum Absturzzeitpunkt"),
+                L.T("Windows hat den Grafiktreiber neu gestartet, weil die GPU nicht mehr reagierte."),
+                L.T("GPU-Übertaktung/Undervolt zurücksetzen, Temperaturen prüfen, Treiber neu installieren, Netzteil als Ursache in Betracht ziehen."))
             { Category = "Hardware" });
         if (c.NearbyEvents.Any(e => e.Kind == SystemEventKind.Whea))
-            c.Findings.Add(new Finding(Severity.Critical, "Hardwarefehler (WHEA) zum Absturzzeitpunkt",
-                "Windows hat einen Hardwarefehler protokolliert (CPU, RAM oder PCIe).",
-                "Übertaktung von CPU/RAM (inkl. XMP/EXPO, Curve Optimizer) testweise deaktivieren und Stabilitätstest durchführen.")
+            c.Findings.Add(new Finding(Severity.Critical, L.T("Hardwarefehler (WHEA) zum Absturzzeitpunkt"),
+                L.T("Windows hat einen Hardwarefehler protokolliert (CPU, RAM oder PCIe)."),
+                L.T("Übertaktung von CPU/RAM (inkl. XMP/EXPO, Curve Optimizer) testweise deaktivieren und Stabilitätstest durchführen."))
             { Category = "Hardware" });
 
         // R8: Exception-spezifische Hinweise
@@ -266,16 +267,30 @@ public static class CrashAnalyzer
         var name = ExceptionName(d.ExceptionCode);
         if (d.ExceptionCode == 0xC0000005 && d.ExceptionParameters.Length >= 2)
         {
-            var op = d.ExceptionParameters[0] switch { 0 => "lesen", 1 => "schreiben", 8 => "ausführen", _ => "zugreifen" };
+            var op = d.ExceptionParameters[0] switch { 0 => L.T("lesen"), 1 => L.T("schreiben"), 8 => L.T("ausführen"), _ => L.T("zugreifen") };
             var addr = d.ExceptionParameters[1];
             return addr < 0x10000
-                ? $"Speicherzugriffsfehler: Versuch, an Adresse 0x{addr:X} zu {op} – ein Null-Zeiger (ein Objekt, das es nicht gibt)."
-                : $"Speicherzugriffsfehler: Versuch, an Adresse 0x{addr:X} zu {op} – auf ungültigen/freigegebenen Speicher.";
+                ? L.F("Speicherzugriffsfehler: Versuch, an Adresse 0x{0:X} zu {1} – ein Null-Zeiger (ein Objekt, das es nicht gibt).", addr, op)
+                : L.F("Speicherzugriffsfehler: Versuch, an Adresse 0x{0:X} zu {1} – auf ungültigen/freigegebenen Speicher.", addr, op);
         }
         return $"{name} (0x{d.ExceptionCode:X8}).";
     }
 
-    private static string ExceptionName(uint code) => code switch
+    // Übersetzt über L.T(code switch …) – für die Vollständigkeitsprüfung hier aufgeführt:
+    // i18n: "Speicherzugriffsfehler (Access Violation)"
+    // i18n: "Stapelüberlauf (Stack Overflow)"
+    // i18n: "Sicherheitsabbruch (Fail Fast / Stack Buffer Overrun)"
+    // i18n: "Ungültige CPU-Anweisung (Illegal Instruction)"
+    // i18n: "Privilegierte Anweisung"
+    // i18n: "Division durch null"
+    // i18n: "Heap-Beschädigung"
+    // i18n: "Unbehandelte C++-Ausnahme"
+    // i18n: "Breakpoint / Assertion"
+    // i18n: "Kein Speicher mehr"
+    // i18n: "DirectX: Gerät entfernt (DXGI_ERROR_DEVICE_REMOVED)"
+    // i18n: "DirectX: Gerät hängt (DXGI_ERROR_DEVICE_HUNG)"
+    // i18n: "Ausnahme"
+    private static string ExceptionName(uint code) => L.T(code switch
     {
         0xC0000005 => "Speicherzugriffsfehler (Access Violation)",
         0xC00000FD => "Stapelüberlauf (Stack Overflow)",
@@ -290,22 +305,22 @@ public static class CrashAnalyzer
         0x887A0005 => "DirectX: Gerät entfernt (DXGI_ERROR_DEVICE_REMOVED)",
         0x887A0006 => "DirectX: Gerät hängt (DXGI_ERROR_DEVICE_HUNG)",
         _ => "Ausnahme",
-    };
+    });
 
     private static Finding? ExceptionHint(DumpAnalysis d) => d.ExceptionCode switch
     {
-        0xC000001D => new Finding(Severity.Warning, "Ungültige CPU-Anweisung",
-            "Dieser Fehler entsteht häufig durch instabile CPU-Übertaktung/Undervolting (z. B. Curve Optimizer) oder sehr selten durch defekte Dateien.",
-            "CPU-Übertaktung/Undervolt testweise zurücksetzen, Spieldateien prüfen lassen.") { Category = "Hardware" },
-        0xC00000FD => new Finding(Severity.Warning, "Stapelüberlauf",
-            "Eine Endlos-Rekursion – sehr oft in Skript-Mods (redscript/CET), die sich gegenseitig aufrufen.",
-            "Kürzlich installierte Skript-Mods prüfen; redscript-Log auf Konflikte („method replacement“) prüfen.") { Category = "Ursache" },
-        0xC0000374 => new Finding(Severity.Warning, "Heap-Beschädigung",
-            "Speicher wurde von fehlerhaftem Code überschrieben. Der eigentliche Verursacher ist oft nicht das abstürzende Modul.",
-            "Native Mods (RED4ext-Plugins) einzeln deaktivieren, um den Verursacher einzugrenzen.") { Category = "Ursache" },
-        0x887A0005 or 0x887A0006 => new Finding(Severity.Critical, "DirectX-Gerät verloren",
-            "Die GPU wurde vom Treiber zurückgesetzt.",
-            "GPU-Übertaktung zurücksetzen, Treiber neu installieren, Temperaturen und Netzteil prüfen.") { Category = "Hardware" },
+        0xC000001D => new Finding(Severity.Warning, L.T("Ungültige CPU-Anweisung"),
+            L.T("Dieser Fehler entsteht häufig durch instabile CPU-Übertaktung/Undervolting (z. B. Curve Optimizer) oder sehr selten durch defekte Dateien."),
+            L.T("CPU-Übertaktung/Undervolt testweise zurücksetzen, Spieldateien prüfen lassen.")) { Category = "Hardware" },
+        0xC00000FD => new Finding(Severity.Warning, L.T("Stapelüberlauf"),
+            L.T("Eine Endlos-Rekursion – sehr oft in Skript-Mods (redscript/CET), die sich gegenseitig aufrufen."),
+            L.T("Kürzlich installierte Skript-Mods prüfen; redscript-Log auf Konflikte („method replacement“) prüfen.")) { Category = "Ursache" },
+        0xC0000374 => new Finding(Severity.Warning, L.T("Heap-Beschädigung"),
+            L.T("Speicher wurde von fehlerhaftem Code überschrieben. Der eigentliche Verursacher ist oft nicht das abstürzende Modul."),
+            L.T("Native Mods (RED4ext-Plugins) einzeln deaktivieren, um den Verursacher einzugrenzen.")) { Category = "Ursache" },
+        0x887A0005 or 0x887A0006 => new Finding(Severity.Critical, L.T("DirectX-Gerät verloren"),
+            L.T("Die GPU wurde vom Treiber zurückgesetzt."),
+            L.T("GPU-Übertaktung zurücksetzen, Treiber neu installieren, Temperaturen und Netzteil prüfen.")) { Category = "Hardware" },
         _ => null,
     };
 
@@ -319,8 +334,8 @@ public static class CrashAnalyzer
 
         var last7 = crashes.Count(c => c.Report.Time >= DateTime.Now.AddDays(-7));
         if (last7 >= 5)
-            result.PatternFindings.Add(new Finding(Severity.Warning, $"{last7} Abstürze in den letzten 7 Tagen",
-                "Das Spiel stürzt regelmäßig ab – es handelt sich nicht um einen Einzelfall."));
+            result.PatternFindings.Add(new Finding(Severity.Warning, L.F("{0} Abstürze in den letzten 7 Tagen", last7),
+                L.T("Das Spiel stürzt regelmäßig ab – es handelt sich nicht um einen Einzelfall.")));
 
         // Gleiche Signatur mehrfach
         foreach (var g in crashes.Where(c => c.Signature != "?").GroupBy(c => c.Signature).Where(g => g.Count() >= 2).OrderByDescending(g => g.Count()).Take(5))
@@ -328,10 +343,10 @@ public static class CrashAnalyzer
             var first = g.First();
             result.PatternFindings.Add(new Finding(
                 g.Count() >= 3 ? Severity.Warning : Severity.Hint,
-                $"Gleicher Absturz {g.Count()}× wiederholt: {g.Key}",
-                $"Immer an derselben Stelle ({ModuleClassifier.KindLabel(first.FaultKind)}: {first.FaultLabel}). Das ist ein reproduzierbarer Fehler, kein Zufall – meist eine bestimmte Mod oder ein bestimmter Ort/Spielstand.",
+                L.F("Gleicher Absturz {0}× wiederholt: {1}", g.Count(), g.Key),
+                L.F("Immer an derselben Stelle ({0}: {1}). Das ist ein reproduzierbarer Fehler, kein Zufall – meist eine bestimmte Mod oder ein bestimmter Ort/Spielstand.", ModuleClassifier.KindLabel(first.FaultKind), first.FaultLabel),
                 null,
-                g.Select(c => c.Report.Time.ToString("dd.MM.yyyy HH:mm")).ToList()));
+                g.Select(c => L.F("{0:g}", c.Report.Time)).ToList()));
         }
 
         // Absturzstelle fest an eine Mod gekoppelt: dieselbe Signatur, und fast jedes Mal dieselbe Mod auf dem Stack
@@ -344,11 +359,10 @@ public static class CrashAnalyzer
                 .OrderByDescending(x => x.Count).FirstOrDefault();
             if (coupled.Name is null) continue;
             result.PatternFindings.Insert(0, new Finding(Severity.Critical,
-                $"Absturzstelle {g.Key} ist an „{coupled.Name}“ gekoppelt",
-                $"Diese Absturzstelle trat {g.Count()}× auf – und {coupled.Count}× davon lag „{coupled.Name}“ im Aufrufpfad. " +
-                "Eine so feste Kopplung ist kein Zufall: Die Mod ruft diesen Teil der Engine auf und übergibt dabei offenbar ungültige Daten.",
-                $"„{coupled.Name}“ testweise deaktivieren. Bleiben diese Abstürze danach aus, ist die Ursache bestätigt – dann nach einem Update suchen oder die Mod weglassen.",
-                g.Select(c => c.Report.Time.ToString("dd.MM.yyyy HH:mm")).ToList())
+                L.F("Absturzstelle {0} ist an „{1}“ gekoppelt", g.Key, coupled.Name),
+                L.F("Diese Absturzstelle trat {0}× auf – und {1}× davon lag „{2}“ im Aufrufpfad. Eine so feste Kopplung ist kein Zufall: Die Mod ruft diesen Teil der Engine auf und übergibt dabei offenbar ungültige Daten.", g.Count(), coupled.Count, coupled.Name),
+                L.F("„{0}“ testweise deaktivieren. Bleiben diese Abstürze danach aus, ist die Ursache bestätigt – dann nach einem Update suchen oder die Mod weglassen.", coupled.Name),
+                g.Select(c => L.F("{0:g}", c.Report.Time)).ToList())
             { Category = "Ursache" });
         }
 
@@ -359,8 +373,8 @@ public static class CrashAnalyzer
         var byKind = crashes.Where(c => c.Dump?.Error is null && c.Dump is not null).GroupBy(c => c.FaultKind)
             .Select(g => $"{ModuleClassifier.KindLabel(g.Key)}: {g.Count()}×").ToList();
         if (byKind.Count > 0)
-            result.PatternFindings.Add(new Finding(Severity.Info, "Wo die Abstürze passieren",
-                "Verteilung nach abstürzendem Modul:", null, byKind));
+            result.PatternFindings.Add(new Finding(Severity.Info, L.T("Wo die Abstürze passieren"),
+                L.T("Verteilung nach abstürzendem Modul:"), null, byKind));
 
         // Welche Mods tauchen über viele Abstürze hinweg auf dem Stack auf?
         var modFreq = crashes
@@ -368,20 +382,22 @@ public static class CrashAnalyzer
             .GroupBy(n => n).Select(g => (Name: g.Key, Count: g.Count()))
             .Where(x => x.Count >= 2).OrderByDescending(x => x.Count).Take(8).ToList();
         if (modFreq.Count > 0)
-            result.PatternFindings.Add(new Finding(Severity.Warning, "Mods, die bei mehreren Abstürzen im Aufrufpfad lagen",
-                "Diese Mods tauchten bei mehreren Abstürzen auf dem Stack auf. Je öfter, desto verdächtiger:",
-                "Mit dem Spitzenreiter anfangen: aktualisieren oder testweise deaktivieren.",
-                modFreq.Select(m => $"{m.Name}: bei {m.Count} von {crashes.Count} Abstürzen").ToList()));
+            result.PatternFindings.Add(new Finding(Severity.Warning, L.T("Mods, die bei mehreren Abstürzen im Aufrufpfad lagen"),
+                L.T("Diese Mods tauchten bei mehreren Abstürzen auf dem Stack auf. Je öfter, desto verdächtiger:"),
+                L.T("Mit dem Spitzenreiter anfangen: aktualisieren oder testweise deaktivieren."),
+                modFreq.Select(m => L.F("{0}: bei {1} von {2} Abstürzen", m.Name, m.Count, crashes.Count)).ToList()));
 
         // Versionen
         var versions = crashes.Select(c => c.Report.InternalVersion).Where(v => v is not null).Distinct().ToList();
         if (versions.Count > 1)
-            result.PatternFindings.Add(new Finding(Severity.Info, "Spielversion hat sich im Zeitraum geändert",
-                "Die Abstürze stammen aus verschiedenen Spielversionen – nach einem Update brauchen viele Mods selbst ein Update.",
+            result.PatternFindings.Add(new Finding(Severity.Info, L.T("Spielversion hat sich im Zeitraum geändert"),
+                L.T("Die Abstürze stammen aus verschiedenen Spielversionen – nach einem Update brauchen viele Mods selbst ein Update."),
                 null, versions!));
     }
 
-    // Bekannte Orte (Weltkoordinaten x/y, Radius in Metern) – bewusst nur sicher zugeordnete Einträge
+    // Bekannte Orte (Weltkoordinaten x/y, Radius in Metern) – bewusst nur sicher zugeordnete Einträge.
+    // Der Name wird beim Anzeigen übersetzt.
+    // i18n: "Megagebäude H10 (Vs Wohnung, Watson)"
     private static readonly (string Name, double X, double Y, double Radius)[] KnownPlaces =
     [
         ("Megagebäude H10 (Vs Wohnung, Watson)", -1370, 1270, 120),
@@ -409,28 +425,28 @@ public static class CrashAnalyzer
         {
             double cx = cl.Average(c => c.Report.Position!.Value.X), cy = cl.Average(c => c.Report.Position!.Value.Y);
             var place = KnownPlaces.FirstOrDefault(p => Math.Sqrt(Math.Pow(p.X - cx, 2) + Math.Pow(p.Y - cy, 2)) < p.Radius + ClusterRadius / 2).Name;
-            var where = place ?? $"bei Koordinaten [{cx:F0}, {cy:F0}]";
+            var where = place is not null ? L.T(place) : L.F("bei Koordinaten [{0:F0}, {1:F0}]", cx, cy);
 
             int sameSpot = cl.Count(c => cl.Count(o => Dist(o.Report.Position!.Value, c.Report.Position!.Value) < 10) >= 2);
             int shortUptime = cl.Count(c => c.Report.UptimeSeconds is < 300);
-            var signatures = cl.GroupBy(c => c.Signature).OrderByDescending(g => g.Count()).ToList();
 
-            var detail = $"{cl.Count} von {located.Count} Abstürzen mit bekannter Position passierten {where} (Umkreis {ClusterRadius:F0} m). ";
+            var detail = L.F("{0} von {1} Abstürzen mit bekannter Position passierten {2} (Umkreis {3:F0} m). ", cl.Count, located.Count, where, ClusterRadius);
             string rec;
             if (sameSpot >= 3 && shortUptime >= cl.Count / 2)
             {
-                detail += $"Mehrere davon an exakt derselben Stelle und kurz nach dem Laden – typisch für einen Spielstand, der genau dort steht und beim Laden immer wieder abstürzt.";
-                rec = "Einen älteren Spielstand an einem anderen Ort laden. Hilft das, liegt es an Objekten/Mods, die an diesem Ort geladen werden.";
+                detail += L.T("Mehrere davon an exakt derselben Stelle und kurz nach dem Laden – typisch für einen Spielstand, der genau dort steht und beim Laden immer wieder abstürzt.");
+                rec = L.T("Einen älteren Spielstand an einem anderen Ort laden. Hilft das, liegt es an Objekten/Mods, die an diesem Ort geladen werden.");
             }
             else
             {
-                detail += "Ein Ort, an dem es immer wieder kracht, deutet auf Mods hin, die dort Inhalte hinzufügen (Garagen, Wohnungs-Deko, Fahrzeuge, NPCs) – oder auf eine dort geladene Szene, die mit Mods kollidiert.";
-                rec = "Prüfen, welche Mods diesen Ort verändern (z. B. Garagen-, Wohnungs- oder Fahrzeug-Mods) und diese testweise deaktivieren. Hinweise auf defekte Mod-Inhalte stehen unter „Mods & System“.";
+                detail += L.T("Ein Ort, an dem es immer wieder kracht, deutet auf Mods hin, die dort Inhalte hinzufügen (Garagen, Wohnungs-Deko, Fahrzeuge, NPCs) – oder auf eine dort geladene Szene, die mit Mods kollidiert.");
+                rec = L.T("Prüfen, welche Mods diesen Ort verändern (z. B. Garagen-, Wohnungs- oder Fahrzeug-Mods) und diese testweise deaktivieren. Hinweise auf defekte Mod-Inhalte stehen unter „Mods & System“.");
             }
             result.PatternFindings.Add(new Finding(cl.Count >= 4 ? Severity.Warning : Severity.Hint,
-                $"Abstürze häufen sich an einem Ort: {where} ({cl.Count}×)",
+                L.F("Abstürze häufen sich an einem Ort: {0} ({1}×)", where, cl.Count),
                 detail, rec,
-                cl.Select(c => $"{c.Report.Time:dd.MM. HH:mm}  Höhe {c.Report.Position!.Value.Z,4:F0} m  {c.Signature}  nach {TimeSpan.FromSeconds(c.Report.UptimeSeconds ?? 0):h\\:mm\\:ss}").ToList())
+                cl.Select(c => L.F("{0:dd.MM. HH:mm}  Höhe {1,4:F0} m  {2}  nach {3}", c.Report.Time, c.Report.Position!.Value.Z, c.Signature,
+                    TimeSpan.FromSeconds(c.Report.UptimeSeconds ?? 0).ToString(@"h\:mm\:ss"))).ToList())
             { Category = "Ort" });
         }
     }
@@ -442,8 +458,8 @@ public static class CrashAnalyzer
     {
         if (install is null)
         {
-            result.EnvironmentFindings.Add(new Finding(Severity.Hint, "Cyberpunk-Installation nicht gefunden",
-                "Ohne Spielordner können Mod-Logs nicht geprüft werden.", "Pfad mit --game angeben."));
+            result.EnvironmentFindings.Add(new Finding(Severity.Hint, L.T("Cyberpunk-Installation nicht gefunden"),
+                L.T("Ohne Spielordner können Mod-Logs nicht geprüft werden."), L.T("Spielordner unter „Mods & System“ → „Datenquellen“ festlegen.")));
         }
 
         if (result.ModLogs is { } logs)
@@ -451,48 +467,46 @@ public static class CrashAnalyzer
             // Versionen der Frameworks gegen das Spiel
             var gameFile = result.GameVersion;
             if (logs.CetGameVersion is { } cetGame && gameFile is not null && !VersionsMatch(cetGame, gameFile))
-                result.EnvironmentFindings.Add(new Finding(Severity.Critical, "Cyber Engine Tweaks passt nicht zur Spielversion",
-                    $"CET meldet Spielversion {cetGame}, installiert ist {gameFile}.",
-                    "CET auf die neueste Version aktualisieren.") { Category = "Mods" });
+                result.EnvironmentFindings.Add(new Finding(Severity.Critical, L.T("Cyber Engine Tweaks passt nicht zur Spielversion"),
+                    L.F("CET meldet Spielversion {0}, installiert ist {1}.", cetGame, gameFile),
+                    L.T("CET auf die neueste Version aktualisieren.")) { Category = "Mods" });
 
             var critical = logs.Issues.Where(i => i.Severity == Severity.Critical).ToList();
             if (critical.Count > 0)
-                result.EnvironmentFindings.Add(new Finding(Severity.Critical, $"{critical.Count} schwere Fehler in Mod-Logs",
-                    "Diese Fehler verhindern, dass Mods korrekt geladen werden:", "Betroffene Mods aktualisieren oder entfernen.",
+                result.EnvironmentFindings.Add(new Finding(Severity.Critical, L.F("{0} schwere Fehler in Mod-Logs", critical.Count),
+                    L.T("Diese Fehler verhindern, dass Mods korrekt geladen werden:"), L.T("Betroffene Mods aktualisieren oder entfernen."),
                     critical.Take(10).Select(Describe).ToList()) { Category = "Mods" });
 
             var conflicts = logs.Issues.Where(i => i.Source == "redscript" && i.Message.Contains("method replacement", StringComparison.OrdinalIgnoreCase)).ToList();
             if (conflicts.Count > 0)
-                result.EnvironmentFindings.Add(new Finding(Severity.Warning, $"{conflicts.Sum(c => c.Count)} redscript-Konflikte",
-                    "Mehrere Mods ersetzen dieselbe Spielfunktion – nur eine davon wirkt. Das führt zu Fehlverhalten und kann Abstürze begünstigen.",
-                    "Bei Konflikten prüfen, ob die Mods als kompatibel gelten; ggf. eine davon entfernen.",
-                    conflicts.GroupBy(c => c.Mod ?? "?").Select(g => $"{g.Key}: {g.Sum(x => x.Count)} Konflikt(e)").ToList()) { Category = "Mods" });
+                result.EnvironmentFindings.Add(new Finding(Severity.Warning, L.F("{0} redscript-Konflikte", conflicts.Sum(c => c.Count)),
+                    L.T("Mehrere Mods ersetzen dieselbe Spielfunktion – nur eine davon wirkt. Das führt zu Fehlverhalten und kann Abstürze begünstigen."),
+                    L.T("Bei Konflikten prüfen, ob die Mods als kompatibel gelten; ggf. eine davon entfernen."),
+                    conflicts.GroupBy(c => c.Mod ?? "?").Select(g => L.F("{0}: {1} Konflikt(e)", g.Key, g.Sum(x => x.Count))).ToList()) { Category = "Mods" });
 
             // Mod-Inhalte, die das Spiel nicht findet (z. B. Garagen ohne geladene Welt-Sektoren)
             foreach (var u in logs.UnresolvedContent.Where(u => u.Items.Count >= 2).OrderByDescending(u => u.Items.Count))
             {
                 var modHint = FindModFiles(install, u.Owner);
                 result.EnvironmentFindings.Add(new Finding(Severity.Warning,
-                    $"Mod-Inhalte werden nicht gefunden: „{u.Owner}“ ({u.Items.Count} Einträge)",
-                    $"{u.Source} meldet, dass {u.Items.Count} Verweise dieser Mod (Orte, Kartenmarkierungen, Journal-Einträge) ins Leere zeigen. " +
-                    "Die Mod ist also nur teilweise geladen – meist wegen einer veralteten Version, einer fehlenden Abhängigkeit oder einer unvollständigen Installation. " +
-                    "An den Orten, die diese Mod verändert, steigt das Absturzrisiko." +
-                    (modHint.Count > 0 ? $" Zugehörige Dateien: {string.Join(", ", modHint.Take(4))}{(modHint.Count > 4 ? " …" : "")}." : ""),
-                    "Mod neu installieren bzw. aktualisieren und Abhängigkeiten auf der Mod-Seite prüfen. Bis dahin testweise deaktivieren – besonders, wenn Abstürze an diesen Orten auftreten.",
+                    L.F("Mod-Inhalte werden nicht gefunden: „{0}“ ({1} Einträge)", u.Owner, u.Items.Count),
+                    L.F("{0} meldet, dass {1} Verweise dieser Mod (Orte, Kartenmarkierungen, Journal-Einträge) ins Leere zeigen. Die Mod ist also nur teilweise geladen – meist wegen einer veralteten Version, einer fehlenden Abhängigkeit oder einer unvollständigen Installation. An den Orten, die diese Mod verändert, steigt das Absturzrisiko.", u.Source, u.Items.Count) +
+                    (modHint.Count > 0 ? " " + L.F("Zugehörige Dateien: {0}.", string.Join(", ", modHint.Take(4)) + (modHint.Count > 4 ? " …" : "")) : ""),
+                    L.T("Mod neu installieren bzw. aktualisieren und Abhängigkeiten auf der Mod-Seite prüfen. Bis dahin testweise deaktivieren – besonders, wenn Abstürze an diesen Orten auftreten."),
                     u.Items.Take(12).ToList())
                 { Category = "Mods" });
             }
 
             var warnings = logs.Issues.Where(i => i.Severity == Severity.Warning).OrderByDescending(i => i.Count).ToList();
             if (warnings.Count > 0)
-                result.EnvironmentFindings.Add(new Finding(Severity.Hint, $"{warnings.Count} verschiedene Fehlermeldungen in Mod-Logs",
-                    "Hintergrundfehler, die nicht zwingend zum Absturz führen (häufigste zuerst):", null,
+                result.EnvironmentFindings.Add(new Finding(Severity.Hint, L.F("{0} verschiedene Fehlermeldungen in Mod-Logs", warnings.Count),
+                    L.T("Hintergrundfehler, die nicht zwingend zum Absturz führen (häufigste zuerst):"), null,
                     warnings.Take(12).Select(Describe).ToList()) { Category = "Mods" });
 
             int total = logs.ArchiveModCount + logs.Red4ExtPluginCount + logs.RedscriptModCount + logs.CetModCount;
-            result.EnvironmentFindings.Add(new Finding(total > 300 ? Severity.Hint : Severity.Info, "Mod-Umfang",
-                $"{logs.ArchiveModCount} Archive-Mods, {logs.Red4ExtPluginCount} RED4ext-Plugins, {logs.RedscriptModCount} redscript-Mods, {logs.CetModCount} CET-Mods.",
-                total > 300 ? "Bei so vielen Mods steigt die Wahrscheinlichkeit für Konflikte und Speicherprobleme deutlich. Zum Eingrenzen Mods in Gruppen deaktivieren (Halbierungsmethode)." : null)
+            result.EnvironmentFindings.Add(new Finding(total > 300 ? Severity.Hint : Severity.Info, L.T("Mod-Umfang"),
+                L.F("{0} Archive-Mods, {1} RED4ext-Plugins, {2} redscript-Mods, {3} CET-Mods.", logs.ArchiveModCount, logs.Red4ExtPluginCount, logs.RedscriptModCount, logs.CetModCount),
+                total > 300 ? L.T("Bei so vielen Mods steigt die Wahrscheinlichkeit für Konflikte und Speicherprobleme deutlich. Zum Eingrenzen Mods in Gruppen deaktivieren (Halbierungsmethode).") : null)
             { Category = "Mods" });
         }
 
@@ -503,21 +517,21 @@ public static class CrashAnalyzer
         // Windows-Ereignisse allgemein
         var tdr = result.SystemEvents.Count(e => e.Kind == SystemEventKind.GpuTimeout);
         if (tdr > 0)
-            result.EnvironmentFindings.Add(new Finding(Severity.Warning, $"{tdr} Grafiktreiber-Probleme in der Ereignisanzeige",
-                "Windows hat Grafiktreiber-Timeouts oder -Fehler protokolliert.", "GPU-Übertaktung, Temperaturen und Treiberversion prüfen.",
-                result.SystemEvents.Where(e => e.Kind == SystemEventKind.GpuTimeout).Take(5).Select(e => $"{e.Time:dd.MM. HH:mm} – {e.Summary}").ToList())
+            result.EnvironmentFindings.Add(new Finding(Severity.Warning, L.F("{0} Grafiktreiber-Probleme in der Ereignisanzeige", tdr),
+                L.T("Windows hat Grafiktreiber-Timeouts oder -Fehler protokolliert."), L.T("GPU-Übertaktung, Temperaturen und Treiberversion prüfen."),
+                result.SystemEvents.Where(e => e.Kind == SystemEventKind.GpuTimeout).Take(5).Select(e => L.F("{0:dd.MM. HH:mm} – {1}", e.Time, e.Summary)).ToList())
             { Category = "Hardware" });
         var whea = result.SystemEvents.Count(e => e.Kind == SystemEventKind.Whea);
         if (whea > 0)
-            result.EnvironmentFindings.Add(new Finding(Severity.Warning, $"{whea} Hardwarefehler (WHEA) in der Ereignisanzeige",
-                "Hinweis auf instabile Hardware (oft Übertaktung von CPU/RAM).", "XMP/EXPO und CPU-Übertaktung testweise deaktivieren.",
-                result.SystemEvents.Where(e => e.Kind == SystemEventKind.Whea).Take(5).Select(e => $"{e.Time:dd.MM. HH:mm} – {e.Summary}").ToList())
+            result.EnvironmentFindings.Add(new Finding(Severity.Warning, L.F("{0} Hardwarefehler (WHEA) in der Ereignisanzeige", whea),
+                L.T("Hinweis auf instabile Hardware (oft Übertaktung von CPU/RAM)."), L.T("XMP/EXPO und CPU-Übertaktung testweise deaktivieren."),
+                result.SystemEvents.Where(e => e.Kind == SystemEventKind.Whea).Take(5).Select(e => L.F("{0:dd.MM. HH:mm} – {1}", e.Time, e.Summary)).ToList())
             { Category = "Hardware" });
         var kp = result.SystemEvents.Count(e => e.Kind == SystemEventKind.UnexpectedShutdown);
         if (kp > 0)
-            result.EnvironmentFindings.Add(new Finding(Severity.Warning, $"{kp}× unerwarteter Neustart des PCs",
-                "Der PC ging ohne sauberes Herunterfahren aus. Beim Spielen oft Netzteil, Temperatur oder Übertaktung.", null,
-                result.SystemEvents.Where(e => e.Kind == SystemEventKind.UnexpectedShutdown).Take(5).Select(e => e.Time.ToString("dd.MM.yyyy HH:mm")).ToList())
+            result.EnvironmentFindings.Add(new Finding(Severity.Warning, L.F("{0}× unerwarteter Neustart des PCs", kp),
+                L.T("Der PC ging ohne sauberes Herunterfahren aus. Beim Spielen oft Netzteil, Temperatur oder Übertaktung."), null,
+                result.SystemEvents.Where(e => e.Kind == SystemEventKind.UnexpectedShutdown).Take(5).Select(e => L.F("{0:g}", e.Time)).ToList())
             { Category = "Hardware" });
     }
 
@@ -560,26 +574,26 @@ public static class CrashAnalyzer
             {
                 double gb = tm.GetInt64() / 1024d / 1024 / 1024;
                 if (gb < 15.5)
-                    result.EnvironmentFindings.Add(new Finding(Severity.Warning, $"Nur {gb:F0} GB Arbeitsspeicher",
-                        "Cyberpunk 2.x empfiehlt mindestens 16 GB, mit vielen Mods eher 32 GB.", null) { Category = "System" });
+                    result.EnvironmentFindings.Add(new Finding(Severity.Warning, L.F("Nur {0:F0} GB Arbeitsspeicher", gb),
+                        L.T("Cyberpunk 2.x empfiehlt mindestens 16 GB, mit vielen Mods eher 32 GB."), null) { Category = "System" });
                 else if (gb < 31 && result.ModLogs is { ArchiveModCount: > 200 })
-                    result.EnvironmentFindings.Add(new Finding(Severity.Hint, $"{gb:F0} GB RAM bei sehr vielen Mods",
-                        "Mit mehreren hundert Mods kann es mit 16 GB eng werden (Nachladeruckler, Out-of-Memory).",
-                        "Auslagerungsdatei auf „automatisch“ lassen, Browser/Discord beim Spielen schließen.") { Category = "System" });
+                    result.EnvironmentFindings.Add(new Finding(Severity.Hint, L.F("{0:F0} GB RAM bei sehr vielen Mods", gb),
+                        L.T("Mit mehreren hundert Mods kann es mit 16 GB eng werden (Nachladeruckler, Out-of-Memory)."),
+                        L.T("Auslagerungsdatei auf „automatisch“ lassen, Browser/Discord beim Spielen schließen.")) { Category = "System" });
             }
 
             if (sys.TryGetProperty("MemoryBanks", out var banks) && banks.ValueKind == JsonValueKind.Array)
             {
                 int count = banks.GetArrayLength();
                 if (count == 1)
-                    result.EnvironmentFindings.Add(new Finding(Severity.Warning, "RAM läuft im Single-Channel",
-                        "Es ist nur ein Speichermodul verbaut. Das kostet in CPU-lastigen Spielen wie Cyberpunk spürbar FPS.",
-                        "Zweites, baugleiches Modul ergänzen.") { Category = "Performance" });
+                    result.EnvironmentFindings.Add(new Finding(Severity.Warning, L.T("RAM läuft im Single-Channel"),
+                        L.T("Es ist nur ein Speichermodul verbaut. Das kostet in CPU-lastigen Spielen wie Cyberpunk spürbar FPS."),
+                        L.T("Zweites, baugleiches Modul ergänzen.")) { Category = "Performance" });
                 var speeds = banks.EnumerateArray().Select(b => b.TryGetProperty("Speed", out var sp) && sp.ValueKind == JsonValueKind.Number ? sp.GetInt32() : 0).Where(x => x > 0).ToList();
                 if (speeds.Count > 0 && speeds.Min() <= 2666)
-                    result.EnvironmentFindings.Add(new Finding(Severity.Hint, $"RAM läuft mit {speeds.Min()} MT/s",
-                        "Aktuelle CPUs (besonders AMD Ryzen) profitieren deutlich von schnellerem RAM (3200–3600 MT/s bei DDR4).",
-                        "Im BIOS prüfen, ob das XMP/DOCP-Profil aktiv ist. Ist der RAM selbst nur für diesen Takt spezifiziert, bringt schnellerer RAM spürbar mehr FPS.") { Category = "Performance" });
+                    result.EnvironmentFindings.Add(new Finding(Severity.Hint, L.F("RAM läuft mit {0} MT/s", speeds.Min()),
+                        L.T("Aktuelle CPUs (besonders AMD Ryzen) profitieren deutlich von schnellerem RAM (3200–3600 MT/s bei DDR4)."),
+                        L.T("Im BIOS prüfen, ob das XMP/DOCP-Profil aktiv ist. Ist der RAM selbst nur für diesen Takt spezifiziert, bringt schnellerer RAM spürbar mehr FPS.")) { Category = "Performance" });
             }
 
             // Freier Platz auf C: (Shader-Cache immer; Auslagerungsdatei nur, wenn sie dort liegt und wachsen kann)
@@ -604,12 +618,12 @@ public static class CrashAnalyzer
                         var idx = pid.GetString()?.Replace(@"\\.\PHYSICALDRIVE", "");
                         var disk = disks.EnumerateArray().FirstOrDefault(x => x.GetProperty("DeviceId").GetString() == idx);
                         if (disk.ValueKind == JsonValueKind.Object && disk.TryGetProperty("MediaType", out var mt) && mt.GetInt32() == 3)
-                            result.EnvironmentFindings.Add(new Finding(Severity.Critical, "Spiel liegt auf einer Festplatte (HDD)",
-                                "Cyberpunk 2.x setzt eine SSD voraus. Auf einer HDD gibt es Nachladeruckler, fehlende Texturen und Abstürze beim Streaming.",
-                                "Spiel auf eine SSD verschieben.") { Category = "Performance" });
+                            result.EnvironmentFindings.Add(new Finding(Severity.Critical, L.T("Spiel liegt auf einer Festplatte (HDD)"),
+                                L.T("Cyberpunk 2.x setzt eine SSD voraus. Auf einer HDD gibt es Nachladeruckler, fehlende Texturen und Abstürze beim Streaming."),
+                                L.T("Spiel auf eine SSD verschieben.")) { Category = "Performance" });
                         else if (disk.ValueKind == JsonValueKind.Object)
-                            result.EnvironmentFindings.Add(new Finding(Severity.Info, "Spiel liegt auf einer SSD",
-                                $"{disk.GetProperty("FriendlyName").GetString()} – gut.", null) { Category = "System" });
+                            result.EnvironmentFindings.Add(new Finding(Severity.Info, L.T("Spiel liegt auf einer SSD"),
+                                L.F("{0} – gut.", disk.GetProperty("FriendlyName").GetString()), null) { Category = "System" });
                     }
                 }
             }
@@ -628,20 +642,19 @@ public static class CrashAnalyzer
     public static Finding LowSpaceOnC(long freeBytes, long sizeBytes, PageFileInfo pageFile)
     {
         const double Gb = 1024d * 1024 * 1024;
-        string title = $"Wenig Platz auf C: ({freeBytes / Gb:F0} GB frei von {sizeBytes / Gb:F0} GB)";
+        string title = L.F("Wenig Platz auf C: ({0:F0} GB frei von {1:F0} GB)", freeBytes / Gb, sizeBytes / Gb);
 
         if (pageFile.CanGrowOn("C:"))
             return new Finding(freeBytes < 10 * Gb ? Severity.Warning : Severity.Hint, title,
-                "Die Auslagerungsdatei und der Shader-Cache liegen auf C:. Ist der Platz knapp, kann Windows den virtuellen Speicher nicht vergrößern – das führt zu Abstürzen ohne klare Fehlermeldung.",
-                "Mindestens 25–30 GB auf C: freihalten.") { Category = "System" };
+                L.T("Die Auslagerungsdatei und der Shader-Cache liegen auf C:. Ist der Platz knapp, kann Windows den virtuellen Speicher nicht vergrößern – das führt zu Abstürzen ohne klare Fehlermeldung."),
+                L.T("Mindestens 25–30 GB auf C: freihalten.")) { Category = "System" };
 
         var elsewhere = pageFile.Drives().Where(d => d != "C:").ToList();
-        string pageNote = pageFile.Disabled ? "Die Auslagerungsdatei ist deaktiviert."
-            : pageFile.Drives().Contains("C:") ? "Die Auslagerungsdatei auf C: hat eine feste Größe und ist davon nicht betroffen."
-            : $"Die Auslagerungsdatei liegt auf {string.Join(", ", elsewhere)} und ist davon nicht betroffen.";
+        string pageNote = pageFile.Disabled ? L.T("Die Auslagerungsdatei ist deaktiviert.")
+            : pageFile.Drives().Contains("C:") ? L.T("Die Auslagerungsdatei auf C: hat eine feste Größe und ist davon nicht betroffen.")
+            : L.F("Die Auslagerungsdatei liegt auf {0} und ist davon nicht betroffen.", string.Join(", ", elsewhere));
         return new Finding(freeBytes < 5 * Gb ? Severity.Warning : Severity.Hint, title,
-            "Der Shader-Cache des Grafiktreibers und temporäre Dateien liegen auf C:. Ist der Platz knapp, können neue Shader nicht gespeichert werden – " +
-            "das führt zu Nachladerucklern, und Windows-Updates oder Absturzberichte können scheitern. " + pageNote,
-            "Mindestens 15–20 GB auf C: freihalten.") { Category = "System" };
+            L.T("Der Shader-Cache des Grafiktreibers und temporäre Dateien liegen auf C:. Ist der Platz knapp, können neue Shader nicht gespeichert werden – das führt zu Nachladerucklern, und Windows-Updates oder Absturzberichte können scheitern.") + " " + pageNote,
+            L.T("Mindestens 15–20 GB auf C: freihalten.")) { Category = "System" };
     }
 }

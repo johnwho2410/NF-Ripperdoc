@@ -1,3 +1,4 @@
+using GameDoctor.Core.Localization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
@@ -153,7 +154,7 @@ public sealed class OpenAiCompatibleClient : AiClient
                 catch (JsonException) { continue; }
 
                 if (node?["error"] is { } err)
-                    throw new AiException("Der Dienst hat die Antwort mit einem Fehler abgebrochen: " + ErrorText(err));
+                    throw new AiException(L.F("Der Dienst hat die Antwort mit einem Fehler abgebrochen: {0}", ErrorText(err)));
 
                 var delta = node?["choices"]?[0]?["delta"]?["content"]?.GetValue<string>();
                 if (!string.IsNullOrEmpty(delta))
@@ -163,7 +164,7 @@ public sealed class OpenAiCompatibleClient : AiClient
                 }
             }
             if (!any)
-                throw new AiException("Der Dienst hat eine leere Antwort geschickt. Eventuell unterstützt das gewählte Modell kein Streaming oder ist überlastet – ein anderes Modell versuchen.");
+                throw new AiException(L.T("Der Dienst hat eine leere Antwort geschickt. Eventuell unterstützt das gewählte Modell kein Streaming oder ist überlastet – ein anderes Modell versuchen."));
         }
     }
 
@@ -171,14 +172,14 @@ public sealed class OpenAiCompatibleClient : AiClient
     {
         AiException a => a,
         HttpRequestException { InnerException: SocketException } or HttpRequestException { StatusCode: null } when _settings.Provider.IsLocal =>
-            new AiException($"{ProviderName} ist unter {_baseUrl} nicht erreichbar. Läuft das Programm und ist der lokale Server gestartet?", e),
+            new AiException(L.F("{0} ist unter {1} nicht erreichbar. Läuft das Programm und ist der lokale Server gestartet?", ProviderName, _baseUrl), e),
         HttpRequestException =>
-            new AiException($"Keine Verbindung zu {_baseUrl}. Internetverbindung und Adresse prüfen.", e),
+            new AiException(L.F("Keine Verbindung zu {0}. Internetverbindung und Adresse prüfen.", _baseUrl), e),
         TaskCanceledException or OperationCanceledException =>
-            new AiException("Der Dienst hat nicht rechtzeitig geantwortet.", e),
+            new AiException(L.T("Der Dienst hat nicht rechtzeitig geantwortet."), e),
         IOException =>
-            new AiException("Die Verbindung ist während der Antwort abgebrochen.", e),
-        _ => new AiException("Unerwarteter Fehler: " + e.Message, e),
+            new AiException(L.T("Die Verbindung ist während der Antwort abgebrochen."), e),
+        _ => new AiException(L.F("Unerwarteter Fehler: {0}", e.Message), e),
     };
 
     private AiException ErrorFor(HttpStatusCode code, string body)
@@ -193,16 +194,16 @@ public sealed class OpenAiCompatibleClient : AiClient
 
         string msg = (int)code switch
         {
-            401 or 403 => "Der API-Key wurde abgelehnt. Bitte in den KI-Einstellungen prüfen.",
-            402 => "Beim Anbieter ist nicht genug Guthaben vorhanden.",
-            404 => $"Adresse oder Modell „{Model}“ nicht gefunden. Modellnamen in den KI-Einstellungen prüfen.",
-            408 or 504 => "Der Dienst hat nicht rechtzeitig geantwortet.",
-            413 => "Der Prompt ist für dieses Modell zu lang. Weniger Daten auswählen oder ein Modell mit größerem Kontext nehmen.",
-            429 => "Zu viele Anfragen oder Gratis-Kontingent aufgebraucht. Kurz warten oder anderes Modell wählen.",
-            >= 500 => "Der Dienst hat gerade ein Problem. Später nochmal versuchen.",
-            _ => $"Anfrage fehlgeschlagen (HTTP {(int)code}).",
+            401 or 403 => L.T("Der API-Key wurde abgelehnt. Bitte in den KI-Einstellungen prüfen."),
+            402 => L.T("Beim Anbieter ist nicht genug Guthaben vorhanden."),
+            404 => L.F("Adresse oder Modell „{0}“ nicht gefunden. Modellnamen in den KI-Einstellungen prüfen.", Model),
+            408 or 504 => L.T("Der Dienst hat nicht rechtzeitig geantwortet."),
+            413 => L.T("Der Prompt ist für dieses Modell zu lang. Weniger Daten auswählen oder ein Modell mit größerem Kontext nehmen."),
+            429 => L.T("Zu viele Anfragen oder Gratis-Kontingent aufgebraucht. Kurz warten oder anderes Modell wählen."),
+            >= 500 => L.T("Der Dienst hat gerade ein Problem. Später nochmal versuchen."),
+            _ => L.F("Anfrage fehlgeschlagen (HTTP {0}).", (int)code),
         };
-        return new AiException($"{msg}\n\nAntwort des Dienstes: {detail}".TrimEnd());
+        return new AiException((msg + "\n\n" + L.F("Antwort des Dienstes: {0}", detail)).TrimEnd());
     }
 
     private static string ErrorText(JsonNode err) =>

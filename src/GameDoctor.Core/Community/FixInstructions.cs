@@ -1,4 +1,5 @@
 using GameDoctor.Core.Games.Cyberpunk;
+using GameDoctor.Core.Localization;
 
 namespace GameDoctor.Core.Community;
 
@@ -21,45 +22,47 @@ public static class FixInstructions
             {
                 "Vortex" =>
                 [
-                    "Cyberpunk beenden.",
-                    "Vortex öffnen und links auf „Mods“ gehen.",
-                    $"Oben im Suchfeld nach „{package}“ suchen.",
-                    "In der Spalte „Status“ den Schalter auf „Deaktiviert“ stellen.",
-                    "Oben auf „Bereitstellen“ (Deploy) klicken – erst dann verschwinden die Dateien aus dem Spielordner.",
-                    "Zurück zu GameDoctor und „Erneut prüfen“ klicken. Steht dort „Mod ist deaktiviert“, kannst du ganz normal spielen.",
+                    L.T("Cyberpunk beenden."),
+                    L.T("Vortex öffnen und links auf „Mods“ gehen."),
+                    L.F("Oben im Suchfeld nach „{0}“ suchen.", package),
+                    L.T("In der Spalte „Status“ den Schalter auf „Deaktiviert“ stellen."),
+                    L.T("Oben auf „Bereitstellen“ (Deploy) klicken – erst dann verschwinden die Dateien aus dem Spielordner."),
+                    L.T("Zurück zu GameDoctor und „Erneut prüfen“ klicken. Steht dort „Mod ist deaktiviert“, kannst du ganz normal spielen."),
                 ],
                 "Mod Organizer 2" =>
                 [
-                    "Cyberpunk beenden.",
-                    "Mod Organizer 2 öffnen.",
-                    $"In der Mod-Liste links das Häkchen bei „{package}“ entfernen.",
-                    "Das Spiel künftig über Mod Organizer 2 starten („Ausführen“) – nur dann gilt die Änderung.",
-                    "Zurück zu GameDoctor und „Erneut prüfen“ klicken.",
+                    L.T("Cyberpunk beenden."),
+                    L.T("Mod Organizer 2 öffnen."),
+                    L.F("In der Mod-Liste links das Häkchen bei „{0}“ entfernen.", package),
+                    L.T("Das Spiel künftig über Mod Organizer 2 starten („Ausführen“) – nur dann gilt die Änderung."),
+                    L.T("Zurück zu GameDoctor und „Erneut prüfen“ klicken."),
                 ],
                 _ => ManualDisable(targetFiles, install),
             },
 
             FixAction.UpdateMod =>
             [
-                "Cyberpunk beenden.",
-                nexus is not null ? $"Die Mod-Seite öffnen: {nexus} – im Reiter „Files“ die neueste Version herunterladen." : $"Die neueste Version von „{package}“ von der Mod-Seite herunterladen.",
+                L.T("Cyberpunk beenden."),
+                nexus is not null
+                    ? L.F("Die Mod-Seite öffnen: {0} – im Reiter „Files“ die neueste Version herunterladen.", nexus)
+                    : L.F("Die neueste Version von „{0}“ von der Mod-Seite herunterladen.", package),
                 inventory.Manager switch
                 {
-                    "Vortex" => "Über „Mod Manager Download“ installiert Vortex die neue Version; danach auf „Bereitstellen“ klicken.",
-                    "Mod Organizer 2" => "Über „Mod Manager Download“ in Mod Organizer 2 installieren und die neue Version aktivieren.",
-                    _ => "Die alten Dateien durch die neuen ersetzen (vorher sichern).",
+                    "Vortex" => L.T("Über „Mod Manager Download“ installiert Vortex die neue Version; danach auf „Bereitstellen“ klicken."),
+                    "Mod Organizer 2" => L.T("Über „Mod Manager Download“ in Mod Organizer 2 installieren und die neue Version aktivieren."),
+                    _ => L.T("Die alten Dateien durch die neuen ersetzen (vorher sichern)."),
                 },
-                "Auf der Mod-Seite prüfen, ob auch Abhängigkeiten (RED4ext, Codeware, ArchiveXL, TweakXL …) ein Update brauchen.",
-                "Danach ganz normal spielen – GameDoctor beobachtet, ob die Abstürze an dieser Stelle ausbleiben.",
+                L.T("Auf der Mod-Seite prüfen, ob auch Abhängigkeiten (RED4ext, Codeware, ArchiveXL, TweakXL …) ein Update brauchen."),
+                L.T("Danach ganz normal spielen – GameDoctor beobachtet, ob die Abstürze an dieser Stelle ausbleiben."),
             ],
 
             FixAction.ChangeSetting =>
             [
-                "Die Änderung im Spiel bzw. in Windows vornehmen (falls noch nicht geschehen).",
-                "Danach ganz normal spielen – GameDoctor beobachtet ab jetzt, ob die Abstürze an dieser Stelle ausbleiben.",
+                L.T("Die Änderung im Spiel bzw. in Windows vornehmen (falls noch nicht geschehen)."),
+                L.T("Danach ganz normal spielen – GameDoctor beobachtet ab jetzt, ob die Abstürze an dieser Stelle ausbleiben."),
             ],
 
-            _ => ["Die Änderung vornehmen und danach ganz normal spielen."],
+            _ => [L.T("Die Änderung vornehmen und danach ganz normal spielen.")],
         };
     }
 
@@ -67,21 +70,21 @@ public static class FixInstructions
     {
         var steps = new List<string>
         {
-            "Cyberpunk beenden.",
-            "Einen Sicherungsordner anlegen, z. B. „Cyberpunk Mods deaktiviert“ auf dem Desktop.",
+            L.T("Cyberpunk beenden."),
+            L.T("Einen Sicherungsordner anlegen, z. B. „Cyberpunk Mods deaktiviert“ auf dem Desktop."),
         };
         var located = install is null ? [] : Locate(install, targetFiles).Take(8).ToList();
         if (located.Count > 0)
         {
-            steps.Add("Diese Dateien aus dem Spielordner dorthin verschieben (nicht löschen – so kannst du sie später zurücklegen):");
+            steps.Add(L.T("Diese Dateien aus dem Spielordner dorthin verschieben (nicht löschen – so kannst du sie später zurücklegen):"));
             steps.AddRange(located.Select(f => "   • " + f));
-            if (targetFiles.Count > located.Count) steps.Add($"   • … und weitere Dateien dieser Mod ({targetFiles.Count} insgesamt)");
+            if (targetFiles.Count > located.Count) steps.Add("   • " + L.F("… und weitere Dateien dieser Mod ({0} insgesamt)", targetFiles.Count));
         }
         else
         {
-            steps.Add($"Die Dateien der Mod aus dem Spielordner dorthin verschieben: {string.Join(", ", targetFiles.Take(5))}{(targetFiles.Count > 5 ? " …" : "")}");
+            steps.Add(L.F("Die Dateien der Mod aus dem Spielordner dorthin verschieben: {0}", string.Join(", ", targetFiles.Take(5)) + (targetFiles.Count > 5 ? " …" : "")));
         }
-        steps.Add("Zurück zu GameDoctor und „Erneut prüfen“ klicken.");
+        steps.Add(L.T("Zurück zu GameDoctor und „Erneut prüfen“ klicken."));
         return steps;
     }
 

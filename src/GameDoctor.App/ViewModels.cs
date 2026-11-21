@@ -1,3 +1,4 @@
+using GameDoctor.Core.Localization;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -32,25 +33,25 @@ public sealed class CrashViewModel
     {
         Case = c;
         var r = c.Report;
-        TimeText = r.Time.ToString("dd.MM.yyyy  HH:mm");
+        TimeText = r.Time.ToString("g");
         Label = c.FaultLabel;
         KindLabel = ModuleClassifier.KindLabel(c.FaultKind);
         TopSeverity = c.Findings.Count > 0 ? c.Findings.Max(f => f.Severity) : Severity.Info;
         Badge = SeverityBrushConverter.For(TopSeverity);
         Uptime = r.UptimeSeconds is int u ? TimeSpan.FromSeconds(u).ToString(@"h\:mm\:ss") : "?";
         Findings = c.Findings;
-        SuspectModules = c.SuspectModules.Select(s => $"{s.Name}  ·  {ModuleClassifier.KindLabel(s.Kind)}  ·  {s.Hits}× auf dem Stack").ToList();
+        SuspectModules = c.SuspectModules.Select(s => L.F("{0}  ·  {1}  ·  {2}× auf dem Stack", s.Name, ModuleClassifier.KindLabel(s.Kind), s.Hits)).ToList();
 
         Details =
         [
-            new("Absturzstelle", c.Signature),
-            new("Fehler", r.Expression ?? r.ErrorReason ?? "?"),
-            new("Laufzeit bis Absturz", Uptime),
-            new("Ladezustand", r.LoadingStage ?? "?"),
+            new(L.T("Absturzstelle"), c.Signature),
+            new(L.T("Fehler"), r.Expression ?? r.ErrorReason ?? "?"),
+            new(L.T("Laufzeit bis Absturz"), Uptime),
+            new(L.T("Ladezustand"), r.LoadingStage ?? "?"),
             new("VRAM", r.VramUsedMb is int used && r.VramTotalMb is int total ? $"{used:N0} / {total:N0} MB ({100.0 * used / total:F0} %)" : "?"),
-            new("Grafikkarte", $"{r.GpuName ?? "?"}  ·  Treiber {r.GpuDriver ?? "?"}"),
-            new("Raytracing", r.RayTracing switch { true => "an", false => "aus", _ => "?" }),
-            new("Spielversion", $"Patch {r.Patch ?? "?"}  ·  {r.InternalVersion ?? "?"}"),
+            new(L.T("Grafikkarte"), L.F("{0}  ·  Treiber {1}", r.GpuName ?? "?", r.GpuDriver ?? "?")),
+            new(L.T("Raytracing"), r.RayTracing switch { true => L.T("an"), false => L.T("aus"), _ => "?" }),
+            new(L.T("Spielversion"), $"Patch {r.Patch ?? "?"}  ·  {r.InternalVersion ?? "?"}"),
         ];
     }
 
@@ -79,8 +80,14 @@ public sealed class PerformanceViewModel : ObservableObject
     private IReadOnlyList<(double Sec, double Ms)>? _stutters;
     private double _gpuShare, _cpuShare, _capShare;
 
+    /// <summary>Nach einem Sprachwechsel die berechneten Texte neu abfragen.</summary>
+    public void RefreshLanguage()
+    {
+        Raise(nameof(RecordButtonText)); Raise(nameof(OverlayButtonText)); Raise(nameof(OverlayHint));
+    }
+
     public bool IsRecording { get => _isRecording; set { if (Set(ref _isRecording, value)) Raise(nameof(RecordButtonText)); } }
-    public string RecordButtonText => IsRecording ? "■  Aufnahme beenden" : "●  Aufnahme starten";
+    public string RecordButtonText => IsRecording ? "■  " + L.T("Aufnahme beenden") : "●  " + L.T("Aufnahme starten");
     public bool PresentMonAvailable { get => _presentMonAvailable; set { if (Set(ref _presentMonAvailable, value)) Raise(nameof(PresentMonMissing)); } }
     public bool PresentMonMissing => !_presentMonAvailable;
     public bool HasReport { get => _hasReport; set => Set(ref _hasReport, value); }
@@ -89,8 +96,8 @@ public sealed class PerformanceViewModel : ObservableObject
     private bool _overlayVisible;
     private OverlayCorner _overlayCorner;
     public bool OverlayVisible { get => _overlayVisible; set { if (Set(ref _overlayVisible, value)) Raise(nameof(OverlayButtonText)); } }
-    public string OverlayButtonText => OverlayVisible ? "Overlay ausblenden" : "Overlay einblenden";
-    public string OverlayHint => $"Liegt über dem Spiel (randloses Fenster nötig) und meldet Probleme live. Ein/aus im Spiel: {OverlayController.HotkeyText}";
+    public string OverlayButtonText => OverlayVisible ? L.T("Overlay ausblenden") : L.T("Overlay einblenden");
+    public string OverlayHint => L.F("Liegt über dem Spiel (randloses Fenster nötig) und meldet Probleme live. Ein/aus im Spiel: {0}", OverlayController.HotkeyText);
     public OverlayCorner OverlayCorner
     {
         get => _overlayCorner;
@@ -113,7 +120,7 @@ public sealed class PerformanceViewModel : ObservableObject
     public double GpuShare { get => _gpuShare; set { Set(ref _gpuShare, value); Raise(nameof(ShareText)); } }
     public double CpuShare { get => _cpuShare; set { Set(ref _cpuShare, value); Raise(nameof(ShareText)); } }
     public double CapShare { get => _capShare; set { Set(ref _capShare, value); Raise(nameof(ShareText)); } }
-    public string ShareText => $"GPU-Limit {GpuShare * 100:F0} %   ·   CPU-Limit {CpuShare * 100:F0} %   ·   begrenzt (FPS-Limit/VSync) {CapShare * 100:F0} %";
+    public string ShareText => L.F("GPU-Limit {0:F0} %   ·   CPU-Limit {1:F0} %   ·   begrenzt (FPS-Limit/VSync) {2:F0} %", GpuShare * 100, CpuShare * 100, CapShare * 100);
 
     public ObservableCollection<StatTile> LiveTiles { get; } = [];
     public ObservableCollection<StatTile> ResultTiles { get; } = [];
@@ -123,14 +130,14 @@ public sealed class PerformanceViewModel : ObservableObject
     {
         LiveTiles.Clear();
         LiveTiles.Add(new StatTile(s.Fps?.ToString("F0") ?? "–", "FPS", s.FrameTimeMs is double ft ? $"{ft:F1} ms" : null));
-        LiveTiles.Add(new StatTile(s.OnePercentLowFps?.ToString("F0") ?? "–", "1 % Low (10 s)"));
-        LiveTiles.Add(new StatTile($"{s.CpuMaxCorePct:F0} %", "CPU stärkster Kern", $"gesamt {s.CpuTotalPct:F0} %"));
-        LiveTiles.Add(new StatTile(s.GpuUtilPct is double g ? $"{g:F0} %" : "–", "GPU-Last", s.GpuTempC is double t ? $"{t:F0} °C" : null));
-        LiveTiles.Add(new StatTile(s.VramUsedMb is double u ? $"{u / 1024:F1} GB" : "–", "VRAM", s.VramTotalMb is double tot ? $"von {tot / 1024:F1} GB" : null));
-        LiveTiles.Add(new StatTile(s.Bottleneck ?? "–", "aktuell", $"{s.Elapsed:mm\\:ss} · {s.FrameCount:N0} Frames"));
+        LiveTiles.Add(new StatTile(s.OnePercentLowFps?.ToString("F0") ?? "–", L.T("1 % Low (10 s)")));
+        LiveTiles.Add(new StatTile($"{s.CpuMaxCorePct:F0} %", L.T("CPU stärkster Kern"), L.F("gesamt {0:F0} %", s.CpuTotalPct)));
+        LiveTiles.Add(new StatTile(s.GpuUtilPct is double g ? $"{g:F0} %" : "–", L.T("GPU-Last"), s.GpuTempC is double t ? $"{t:F0} °C" : null));
+        LiveTiles.Add(new StatTile(s.VramUsedMb is double u ? $"{u / 1024:F1} GB" : "–", "VRAM", s.VramTotalMb is double tot ? L.F("von {0:F1} GB", tot / 1024) : null));
+        LiveTiles.Add(new StatTile(s.Bottleneck ?? "–", L.T("aktuell"), L.F("{0} · {1:N0} Frames", s.Elapsed.ToString(@"mm\:ss"), s.FrameCount)));
         Hint = s.GameRunning
-            ? (s.FrameCount == 0 ? "Cyberpunk läuft – warte auf die ersten Frames …" : "Aufnahme läuft. Spiel ganz normal – am aussagekräftigsten sind 2–5 Minuten in der Stadt oder beim Fahren.")
-            : "Warte auf Cyberpunk 2077 … Starte das Spiel, die Aufnahme beginnt automatisch.";
+            ? (s.FrameCount == 0 ? L.T("Cyberpunk läuft – warte auf die ersten Frames …") : L.T("Aufnahme läuft. Spiel ganz normal – am aussagekräftigsten sind 2–5 Minuten in der Stadt oder beim Fahren."))
+            : L.T("Warte auf Cyberpunk 2077 … Starte das Spiel, die Aufnahme beginnt automatisch.");
     }
 
     public GameDoctor.Core.Performance.PerformanceReport? LastReport { get; private set; }
@@ -139,16 +146,16 @@ public sealed class PerformanceViewModel : ObservableObject
     {
         LastReport = r;
         ResultTiles.Clear();
-        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.AvgFps.ToString("F0") : "–", "Ø FPS"));
-        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.OnePercentLowFps.ToString("F0") : "–", "1 % Low"));
-        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.PointOnePercentLowFps.ToString("F0") : "–", "0,1 % Low"));
-        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.StuttersPerMinute.ToString("F1") : "–", "Ruckler pro Minute", $"{r.StutterCount} insgesamt"));
+        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.AvgFps.ToString("F0") : "–", L.T("Ø FPS")));
+        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.OnePercentLowFps.ToString("F0") : "–", L.T("1 % Low")));
+        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.PointOnePercentLowFps.ToString("F0") : "–", L.T("0,1 % Low")));
+        ResultTiles.Add(new StatTile(r.FrameCount > 0 ? r.StuttersPerMinute.ToString("F1") : "–", L.T("Ruckler pro Minute"), L.F("{0} insgesamt", r.StutterCount)));
         GpuShare = r.GpuLimitedShare;
         CpuShare = r.CpuLimitedShare;
         CapShare = r.CappedShare;
         Series = r.FrameTimeSeries;
         Stutters = r.Stutters;
-        SettingsSummary = r.SettingsSummary is null ? "" : "Spieleinstellungen: " + r.SettingsSummary;
+        SettingsSummary = r.SettingsSummary is null ? "" : L.F("Spieleinstellungen: {0}", r.SettingsSummary);
         Findings.Clear();
         foreach (var f in r.Findings.OrderByDescending(f => f.Severity)) Findings.Add(f);
         HasReport = true;
@@ -191,17 +198,17 @@ public sealed class FixAttemptViewModel
             Instructions = FixAttemptWindow.Numbered(GameDoctor.Core.Community.FixInstructions.For(
                 a.Action, a.TargetLabel, a.NexusModId, a.TargetFiles, inventory, install));
         ConfirmText = ev.ModConfirmedDisabled && ev.Status == GameDoctor.Core.Community.FixStatus.Waiting
-            ? "✔ Mod ist deaktiviert – du kannst ganz normal spielen. GameDoctor wertet bei jeder Analyse aus."
+            ? L.T("✔ Mod ist deaktiviert – du kannst ganz normal spielen. GameDoctor wertet bei jeder Analyse aus.")
             : null;
         var verb = a.Action switch
         {
-            GameDoctor.Core.Community.FixAction.DisableMod => "deaktiviert",
-            GameDoctor.Core.Community.FixAction.UpdateMod => "aktualisiert",
-            GameDoctor.Core.Community.FixAction.ChangeSetting => "geändert",
-            _ => "ausprobiert",
+            GameDoctor.Core.Community.FixAction.DisableMod => L.T("deaktiviert"),
+            GameDoctor.Core.Community.FixAction.UpdateMod => L.T("aktualisiert"),
+            GameDoctor.Core.Community.FixAction.ChangeSetting => L.T("geändert"),
+            _ => L.T("ausprobiert"),
         };
-        Title = a.Action == GameDoctor.Core.Community.FixAction.ChangeSetting ? a.TargetLabel : $"„{a.TargetLabel}“ {verb}";
-        Subtitle = $"seit {a.StartedAt:dd.MM.yyyy HH:mm} · Absturzstelle {string.Join(", ", a.Signatures)}";
+        Title = a.Action == GameDoctor.Core.Community.FixAction.ChangeSetting ? a.TargetLabel : L.F("„{0}“ {1}", a.TargetLabel, verb);
+        Subtitle = L.F("seit {0:g} · Absturzstelle {1}", a.StartedAt, string.Join(", ", a.Signatures));
         Headline = ev.Headline;
         Detail = ev.Detail;
         Progress = Math.Clamp(ev.Progress, 0, 1) * 100;
@@ -215,21 +222,21 @@ public sealed class FixAttemptViewModel
         };
         VerdictText = a.Verdict switch
         {
-            GameDoctor.Core.Community.UserVerdict.Helped => $"Deine Einschätzung: hat geholfen ({a.VerdictAt:dd.MM.})",
-            GameDoctor.Core.Community.UserVerdict.NotHelped => $"Deine Einschätzung: hat nicht geholfen ({a.VerdictAt:dd.MM.})",
+            GameDoctor.Core.Community.UserVerdict.Helped => L.F("Deine Einschätzung: hat geholfen ({0:d})", a.VerdictAt),
+            GameDoctor.Core.Community.UserVerdict.NotHelped => L.F("Deine Einschätzung: hat nicht geholfen ({0:d})", a.VerdictAt),
             _ => null,
         };
         if (a.Verdict == GameDoctor.Core.Community.UserVerdict.Helped && ev.Status == GameDoctor.Core.Community.FixStatus.NotHelped)
-            VerdictText += " – die Absturzdaten sprechen allerdings dagegen.";
+            VerdictText += " – " + L.T("die Absturzdaten sprechen allerdings dagegen.");
         Note = a.Note;
 
         var outcome = ev.ShareableOutcome(a);
         bool publicTarget = a.NexusModId is not null || a.ModuleFile is not null;
         ShareText = !publicTarget
-            ? "Wird nicht mit der Community geteilt (keine öffentliche Mod)."
+            ? L.T("Wird nicht mit der Community geteilt (keine öffentliche Mod).")
             : outcome is null
-                ? "Wird anonym geteilt, sobald das Ergebnis feststeht."
-                : $"Anonym teilbar als „{(outcome == "Helped" ? "hat geholfen" : "hat nicht geholfen")}“.";
+                ? L.T("Wird anonym geteilt, sobald das Ergebnis feststeht.")
+                : L.F("Anonym teilbar als „{0}“.", outcome == "Helped" ? L.T("hat geholfen") : L.T("hat nicht geholfen"));
     }
 
     public GameDoctor.Core.Community.FixAttempt Attempt { get; }
@@ -267,8 +274,8 @@ public sealed class MainViewModel : ObservableObject
     public PerformanceViewModel Perf { get; } = new();
 
     private bool _isBusy;
-    private string _status = "Bereit";
-    private string _gameInfo = "Noch keine Analyse";
+    private string _status = L.T("Bereit");
+    private string _gameInfo = L.T("Noch keine Analyse");
     private string _frameworkInfo = "";
     private int _days = 30;
     private CrashViewModel? _selectedCrash;
@@ -302,28 +309,28 @@ public sealed class MainViewModel : ObservableObject
         DataSources.Clear();
         foreach (var d in r.DataSources) DataSources.Add(new DataSourceViewModel(d));
         GameInfo = r.Install is null
-            ? "Cyberpunk 2077 nicht gefunden"
-            : $"Cyberpunk 2077  ·  Version {r.GameVersion ?? "?"}  ·  {r.Install.Store}  ·  {r.Install.Root}";
+            ? L.T("Cyberpunk 2077 nicht gefunden")
+            : L.F("Cyberpunk 2077  ·  Version {0}  ·  {1}  ·  {2}", r.GameVersion ?? "?", L.T(r.Install.Store), r.Install.Root);
         FrameworkInfo = r.ModLogs is { } ml
-            ? $"RED4ext {ml.Red4ExtVersion ?? "–"}  ·  CET {ml.CetVersion ?? "–"}  ·  {ml.ArchiveModCount} Archive-Mods  ·  {ml.Red4ExtPluginCount} RED4ext-Plugins  ·  {ml.RedscriptModCount} redscript-Mods  ·  {ml.CetModCount} CET-Mods"
+            ? $"RED4ext {ml.Red4ExtVersion ?? "–"}  ·  CET {ml.CetVersion ?? "–"}  ·  " + L.F("{0} Archive-Mods  ·  {1} RED4ext-Plugins  ·  {2} redscript-Mods  ·  {3} CET-Mods", ml.ArchiveModCount, ml.Red4ExtPluginCount, ml.RedscriptModCount, ml.CetModCount)
             : "";
 
         Stats.Clear();
         var crashes = r.Crashes;
-        Stats.Add(new StatTile(crashes.Count.ToString(), $"Abstürze ({Days} Tage)"));
-        Stats.Add(new StatTile(crashes.Count(c => c.Report.Time >= DateTime.Now.AddDays(-7)).ToString(), "letzte 7 Tage"));
+        Stats.Add(new StatTile(crashes.Count.ToString(), L.F("Abstürze ({0} Tage)", Days)));
+        Stats.Add(new StatTile(crashes.Count(c => c.Report.Time >= DateTime.Now.AddDays(-7)).ToString(), L.T("letzte 7 Tage")));
 
         var topSig = crashes.Where(c => c.Signature != "?").GroupBy(c => c.Signature).OrderByDescending(g => g.Count()).FirstOrDefault();
         Stats.Add(topSig is not null
-            ? new StatTile($"{topSig.Count()}×", "häufigste Absturzstelle", topSig.Key)
-            : new StatTile("–", "häufigste Absturzstelle"));
+            ? new StatTile($"{topSig.Count()}×", L.T("häufigste Absturzstelle"), topSig.Key)
+            : new StatTile("–", L.T("häufigste Absturzstelle")));
 
         var topMod = crashes
             .SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay).Select(s => s.Name).Distinct())
             .GroupBy(n => n).OrderByDescending(g => g.Count()).FirstOrDefault();
         Stats.Add(topMod is not null
-            ? new StatTile($"{topMod.Count()}×", "verdächtigste Mod", topMod.Key)
-            : new StatTile("–", "verdächtigste Mod", "keine Mod auffällig"));
+            ? new StatTile($"{topMod.Count()}×", L.T("verdächtigste Mod"), topMod.Key)
+            : new StatTile("–", L.T("verdächtigste Mod"), L.T("keine Mod auffällig")));
 
         TopFindings.Clear();
         foreach (var f in crashes.Take(1).SelectMany(c => c.Findings)

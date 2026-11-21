@@ -43,6 +43,9 @@ public sealed class ModInventory
 
     public bool FromVortex => Manager == "Vortex";
 
+    /// <summary>Hinweis, wenn kein Mod-Manager erkannt wurde (wird als eigener Eintrag in den Datenquellen behandelt).</summary>
+    public static string NoManagerNote => Localization.L.T("Kein Mod-Manager erkannt (Vortex oder Mod Organizer 2). Mods werden nur gezählt, ohne Nexus-IDs.");
+
     /// <summary>Dateinamen (ohne Pfad), die zu dieser Mod gehören.</summary>
     public IReadOnlyList<string> FilesOf(int nexusId) => _filesById.TryGetValue(nexusId, out var l) ? l : [];
 
@@ -67,11 +70,11 @@ public sealed class ModInventory
             else if (File.Exists(Path.Combine(install.Root, "vortex.deployment.json")))
                 inv.LoadVortex(Path.Combine(install.Root, "vortex.deployment.json"));
             else
-                inv.Notes.Add("Kein Mod-Manager erkannt (Vortex oder Mod Organizer 2). Mods werden nur gezählt, ohne Nexus-IDs.");
+                inv.Notes.Add(NoManagerNote);
         }
         catch (Exception ex)
         {
-            inv.Notes.Add("Mod-Liste konnte nicht gelesen werden: " + ex.Message);
+            inv.Notes.Add(Localization.L.F("Mod-Liste konnte nicht gelesen werden: {0}", ex.Message));
         }
         return inv;
     }
@@ -200,7 +203,7 @@ public sealed class ModInventory
         var modlist = Path.Combine(inst.ProfilesDir, inst.Profile, "modlist.txt");
         if (!File.Exists(modlist))
         {
-            Notes.Add($"Mod Organizer 2: Profil „{inst.Profile}“ ohne modlist.txt gefunden.");
+            Notes.Add(Localization.L.F("Mod Organizer 2: Profil „{0}“ ohne modlist.txt gefunden.", inst.Profile));
             return;
         }
 

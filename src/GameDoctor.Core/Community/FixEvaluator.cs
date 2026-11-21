@@ -1,5 +1,6 @@
 using GameDoctor.Core.Analysis;
 using GameDoctor.Core.Games.Cyberpunk;
+using GameDoctor.Core.Localization;
 
 namespace GameDoctor.Core.Community;
 
@@ -90,10 +91,9 @@ public sealed class FixEvaluator
             var still = a.TargetFiles.Where(f => _installedFiles.Contains(f)).ToList();
             if (still.Count > 0)
                 return new FixEvaluation(FixStatus.ModStillInstalled,
-                    $"„{a.TargetLabel}“ ist noch aktiv – bitte selbst deaktivieren",
-                    $"Im Spiel sind noch Dateien dieser Mod vorhanden ({string.Join(", ", still.Take(3))}{(still.Count > 3 ? " …" : "")}). " +
-                    "GameDoctor ändert nichts an deinen Mods – deaktiviere sie wie unten beschrieben und klicke dann auf „Erneut prüfen“. " +
-                    "Bis dahin läuft der Test nicht.",
+                    L.F("„{0}“ ist noch aktiv – bitte selbst deaktivieren", a.TargetLabel),
+                    L.F("Im Spiel sind noch Dateien dieser Mod vorhanden ({0}). GameDoctor ändert nichts an deinen Mods – deaktiviere sie wie unten beschrieben und klicke dann auf „Erneut prüfen“. Bis dahin läuft der Test nicht.",
+                        string.Join(", ", still.Take(3)) + (still.Count > 3 ? " …" : "")),
                     0, playSince, null, []);
             confirmedDisabled = true;
         }
@@ -103,9 +103,9 @@ public sealed class FixEvaluator
             .Select(c => c.Report.Time).OrderBy(t => t).ToList();
         if (recurred.Count > 0)
             return new FixEvaluation(FixStatus.NotHelped,
-                "Hat nicht geholfen",
-                $"Die Absturzstelle trat danach {recurred.Count}× erneut auf (zuerst am {recurred[0]:dd.MM. HH:mm}). " +
-                (a.Action == FixAction.DisableMod ? $"„{a.TargetLabel}“ ist damit sehr wahrscheinlich nicht die Ursache – du kannst die Mod wieder aktivieren." : ""),
+                L.T("Hat nicht geholfen"),
+                L.F("Die Absturzstelle trat danach {0}× erneut auf (zuerst am {1:g}).", recurred.Count, recurred[0]) +
+                (a.Action == FixAction.DisableMod ? " " + L.F("„{0}“ ist damit sehr wahrscheinlich nicht die Ursache – du kannst die Mod wieder aktivieren.", a.TargetLabel) : ""),
                 1, playSince, null, recurred);
 
         // 3) Wie oft trat die Absturzstelle vorher auf – bezogen auf die Spielzeit?
@@ -114,8 +114,7 @@ public sealed class FixEvaluator
             result = result with
             {
                 LocationBound = true,
-                Detail = result.Detail + " Achtung: Die bisherigen Abstürze an dieser Stelle passierten alle am selben Ort in der Spielwelt. " +
-                         "Bleiben sie aus, kann das auch daran liegen, dass du dort nicht mehr warst – am aussagekräftigsten ist der Test, wenn du den Ort wieder besuchst.",
+                Detail = result.Detail + " " + L.T("Achtung: Die bisherigen Abstürze an dieser Stelle passierten alle am selben Ort in der Spielwelt. Bleiben sie aus, kann das auch daran liegen, dass du dort nicht mehr warst – am aussagekräftigsten ist der Test, wenn du den Ort wieder besuchst."),
             };
         return result;
     }
@@ -141,11 +140,11 @@ public sealed class FixEvaluator
             // Keine Vergleichsbasis – einfache Faustregel
             double p = Math.Min(1, playSince / FallbackPlayTime);
             return p >= 1
-                ? new FixEvaluation(FixStatus.LikelyHelped, "Wahrscheinlich geholfen",
-                    $"Seitdem {Hours(playSince)} gespielt ohne diese Absturzstelle. (Zu wenig Daten von vorher für eine genaue Rechnung – Faustregel: 6 Stunden ohne Absturz.)",
+                ? new FixEvaluation(FixStatus.LikelyHelped, L.T("Wahrscheinlich geholfen"),
+                    L.F("Seitdem {0} gespielt ohne diese Absturzstelle. (Zu wenig Daten von vorher für eine genaue Rechnung – Faustregel: 6 Stunden ohne Absturz.)", Hours(playSince)),
                     1, playSince, null, [])
-                : new FixEvaluation(FixStatus.Waiting, "Test läuft",
-                    $"Seitdem {Hours(playSince)} gespielt ohne diese Absturzstelle. Noch etwa {Hours(FallbackPlayTime - playSince)} spielen, dann ist das Ergebnis aussagekräftig.",
+                : new FixEvaluation(FixStatus.Waiting, L.T("Test läuft"),
+                    L.F("Seitdem {0} gespielt ohne diese Absturzstelle. Noch etwa {1} spielen, dann ist das Ergebnis aussagekräftig.", Hours(playSince), Hours(FallbackPlayTime - playSince)),
                     p, playSince, null, []);
         }
 
@@ -154,21 +153,20 @@ public sealed class FixEvaluator
         var every = TimeSpan.FromHours(1 / ratePerHour);
 
         if (expected >= ExpectedForProof)
-            return new FixEvaluation(FixStatus.LikelyHelped, "Hat sehr wahrscheinlich geholfen",
-                $"Vorher trat diese Absturzstelle etwa alle {Hours(every)} Spielzeit auf ({before}× in {Hours(playBefore)}). " +
-                $"Seitdem {Hours(playSince)} gespielt – erwartet wären rund {expected:F0} Abstürze gewesen, aufgetreten ist keiner. " +
-                "Dass das bei unverändertem Problem Zufall ist, liegt bei unter 5 %.",
+            return new FixEvaluation(FixStatus.LikelyHelped, L.T("Hat sehr wahrscheinlich geholfen"),
+                L.F("Vorher trat diese Absturzstelle etwa alle {0} Spielzeit auf ({1}× in {2}). Seitdem {3} gespielt – erwartet wären rund {4:F0} Abstürze gewesen, aufgetreten ist keiner. Dass das bei unverändertem Problem Zufall ist, liegt bei unter 5 %.",
+                    Hours(every), before, Hours(playBefore), Hours(playSince), expected),
                 1, playSince, expected, []);
 
         var needed = TimeSpan.FromHours(ExpectedForProof / ratePerHour) - playSince;
-        return new FixEvaluation(FixStatus.Waiting, "Test läuft",
-            $"Vorher etwa alle {Hours(every)} ein Absturz an dieser Stelle. Seitdem {Hours(playSince)} ohne. " +
-            $"Noch etwa {Hours(needed)} spielen, dann ist das Ergebnis belastbar.",
+        return new FixEvaluation(FixStatus.Waiting, L.T("Test läuft"),
+            L.F("Vorher etwa alle {0} ein Absturz an dieser Stelle. Seitdem {1} ohne. Noch etwa {2} spielen, dann ist das Ergebnis belastbar.",
+                Hours(every), Hours(playSince), Hours(needed)),
             expected / ExpectedForProof, playSince, expected, []);
     }
 
     private static string Hours(TimeSpan t) =>
-        t.TotalMinutes < 90 ? $"{Math.Max(0, t.TotalMinutes):F0} Min." : $"{t.TotalHours:F1} Std.";
+        t.TotalMinutes < 90 ? L.F("{0:F0} Min.", Math.Max(0, t.TotalMinutes)) : L.F("{0:F1} Std.", t.TotalHours);
 
     private static HashSet<string> IndexModFiles(CyberpunkInstall install, IReadOnlyList<string> extraRoots)
     {

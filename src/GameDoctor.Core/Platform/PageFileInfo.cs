@@ -55,11 +55,11 @@ public sealed class PageFileInfo
 
     public string Describe()
     {
-        if (Disabled) return "Auslagerungsdatei ist deaktiviert";
-        if (FullyAutomatic) return "Auslagerungsdatei wird automatisch von Windows verwaltet";
+        if (Disabled) return Localization.L.T("Auslagerungsdatei ist deaktiviert");
+        if (FullyAutomatic) return Localization.L.T("Auslagerungsdatei wird automatisch von Windows verwaltet");
         return string.Join("; ", Files.Select(f => f.SystemManaged
-            ? $"{f.Drive} vom System verwaltet"
-            : $"{f.Drive} fest: Start {f.InitialMb / 1024.0:F0} GB, maximal {f.MaximumMb / 1024.0:F0} GB"));
+            ? Localization.L.F("{0} vom System verwaltet", f.Drive)
+            : Localization.L.F("{0} fest: Start {1:F0} GB, maximal {2:F0} GB", f.Drive, f.InitialMb / 1024.0, f.MaximumMb / 1024.0)));
     }
 
     /// <summary>

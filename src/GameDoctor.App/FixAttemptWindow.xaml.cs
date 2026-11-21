@@ -1,3 +1,4 @@
+using GameDoctor.Core.Localization;
 using System.Windows;
 using System.Windows.Controls;
 using GameDoctor.Core.Analysis;
@@ -29,7 +30,7 @@ public partial class FixAttemptWindow : Window
         SourceInitialized += (_, _) => DarkTitleBar.Apply(this);
 
         int same = result.Crashes.Count(c => c.Signature == crash.Signature);
-        TargetText.Text = $"Absturzstelle {crash.Signature} · {same}× im gewählten Zeitraum · zuletzt am {crash.Report.Time:dd.MM. HH:mm}";
+        TargetText.Text = L.F("Absturzstelle {0} · {1}× im gewählten Zeitraum · zuletzt am {2:g}", crash.Signature, same, crash.Report.Time);
 
         foreach (var s in FixSuggestions.For(crash, result, inventory, classifier))
         {
@@ -69,14 +70,14 @@ public partial class FixAttemptWindow : Window
     private void UpdateInstructions()
     {
         var draft = BuildAttempt(validate: false);
-        var manager = _inventory.Manager ?? "kein Mod-Manager erkannt – Anleitung für manuell installierte Mods";
+        var manager = _inventory.Manager ?? L.T("kein Mod-Manager erkannt – Anleitung für manuell installierte Mods");
         if (draft is null)
         {
-            InstructionsTitle.Text = "So geht's";
-            InstructionsList.ItemsSource = new[] { "Wähle oben aus, was du ausprobieren möchtest." };
+            InstructionsTitle.Text = L.T("So geht’s");
+            InstructionsList.ItemsSource = new[] { L.T("Wähle oben aus, was du ausprobieren möchtest.") };
             return;
         }
-        InstructionsTitle.Text = draft.Action == FixAction.ChangeSetting ? "So geht's" : $"So geht's ({manager})";
+        InstructionsTitle.Text = draft.Action == FixAction.ChangeSetting ? L.T("So geht’s") : L.F("So geht’s ({0})", manager);
         var steps = FixInstructions.For(draft.Action, draft.TargetLabel, draft.NexusModId, draft.TargetFiles, _inventory, _install);
         InstructionsList.ItemsSource = Numbered(steps);
     }
@@ -120,7 +121,7 @@ public partial class FixAttemptWindow : Window
         {
             if (ModCombo.SelectedItem is not InstalledMod mod)
             {
-                if (validate) ErrorText.Text = "Bitte eine Mod aus der Liste wählen.";
+                if (validate) ErrorText.Text = L.T("Bitte eine Mod aus der Liste wählen.");
                 return null;
             }
             return new FixAttempt
@@ -136,14 +137,14 @@ public partial class FixAttemptWindow : Window
         {
             if (note is null && validate)
             {
-                ErrorText.Text = "Bitte kurz in der Notiz festhalten, was du geändert hast.";
+                ErrorText.Text = L.T("Bitte kurz in der Notiz festhalten, was du geändert hast.");
                 return null;
             }
-            var label = note ?? "Einstellung geändert";
+            var label = note ?? L.T("Einstellung geändert");
             return new FixAttempt { Action = FixAction.ChangeSetting, TargetLabel = label.Length > 60 ? label[..60] + " …" : label };
         }
 
-        if (validate) ErrorText.Text = "Bitte eine Möglichkeit auswählen.";
+        if (validate) ErrorText.Text = L.T("Bitte eine Möglichkeit auswählen.");
         return null;
     }
 }

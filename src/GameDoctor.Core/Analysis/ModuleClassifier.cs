@@ -183,8 +183,12 @@ public sealed class ModuleClassifier
     public static string? OverlayProduct(string path)
     {
         var name = Path.GetFileName(path).ToLowerInvariant();
-        return OverlayPrefixes.FirstOrDefault(o => name.StartsWith(o.Prefix, StringComparison.Ordinal)).Product
-               ?? (name is "dxgi.dll" or "d3d11.dll" or "d3d12.dll" ? "ReShade o. ä. (Proxy-DLL im Spielordner)" : null);
+        // i18n: "Steam-Overlay"
+        // i18n: "Discord-Overlay"
+        // i18n: "NVIDIA-Overlay / ShadowPlay"
+        var product = OverlayPrefixes.FirstOrDefault(o => name.StartsWith(o.Prefix, StringComparison.Ordinal)).Product;
+        return (product is null ? null : Localization.L.T(product))
+               ?? (name is "dxgi.dll" or "d3d11.dll" or "d3d12.dll" ? Localization.L.T("ReShade o. ä. (Proxy-DLL im Spielordner)") : null);
     }
 
     /// <summary>Kurzer, lesbarer Name für Mods (z. B. Plugin-Ordner statt DLL-Name).</summary>
@@ -203,13 +207,20 @@ public sealed class ModuleClassifier
         var name = module.Name.ToLowerInvariant();
         if (UnderAnyRoot(p.ToLowerInvariant()))
         {
-            if (name == "version.dll") return "Ultimate ASI Loader (version.dll, lädt CET)";
-            if (name == "winmm.dll") return "RED4ext-Loader (winmm.dll)";
+            if (name == "version.dll") return Localization.L.T("Ultimate ASI Loader (version.dll, lädt CET)");
+            if (name == "winmm.dll") return Localization.L.T("RED4ext-Loader (winmm.dll)");
         }
         return module.Name;
     }
 
-    public static string KindLabel(ModuleKind kind) => kind switch
+    // i18n: "Spiel (Engine)"
+    // i18n: "Spiel-Bibliothek"
+    // i18n: "Mod-Framework"
+    // i18n: "Grafiktreiber"
+    // i18n: "Overlay/Hook"
+    // i18n: "Fremdsoftware"
+    // i18n: "unbekannt"
+    public static string KindLabel(ModuleKind kind) => Localization.L.T(kind switch
     {
         ModuleKind.GameExecutable => "Spiel (Engine)",
         ModuleKind.GameRuntime => "Spiel-Bibliothek",
@@ -220,5 +231,5 @@ public sealed class ModuleClassifier
         ModuleKind.System => "Windows",
         ModuleKind.ThirdParty => "Fremdsoftware",
         _ => "unbekannt",
-    };
+    });
 }

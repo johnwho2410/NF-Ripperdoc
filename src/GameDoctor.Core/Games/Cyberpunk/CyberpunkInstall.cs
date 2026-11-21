@@ -61,7 +61,7 @@ public sealed class CyberpunkInstall
         {
             bool ok = false;
             try { ok = IsGameFolder(path); } catch { /* Laufwerk nicht verfügbar o. ä. */ }
-            probes.Add(new LocateProbe(source, path, ok, ok ? null : "kein Cyberpunk2077.exe gefunden"));
+            probes.Add(new LocateProbe(source, path, ok, ok ? null : Localization.L.T("kein Cyberpunk2077.exe gefunden")));
             if (!ok) continue;
 
             var install = new CyberpunkInstall(path, InferStore(path), source);
@@ -91,7 +91,7 @@ public sealed class CyberpunkInstall
             }
             if (exe is null)
             {
-                probes.Add(new LocateProbe("Laufendes Spiel", null, false, "Spiel läuft, aber der Pfad ist nicht lesbar (Spiel mit Adminrechten gestartet?)"));
+                probes.Add(new LocateProbe("Laufendes Spiel", null, false, Localization.L.T("Spiel läuft, aber der Pfad ist nicht lesbar (Spiel mit Adminrechten gestartet?)")));
                 continue;
             }
             // …\bin\x64\Cyberpunk2077.exe → Spielordner
@@ -111,7 +111,7 @@ public sealed class CyberpunkInstall
             foreach (var lib in libraries.Select(l => l.Replace('/', '\\')).Distinct(StringComparer.OrdinalIgnoreCase))
                 yield return ("Steam", Path.Combine(lib, "steamapps", "common", "Cyberpunk 2077"));
         }
-        else probes.Add(new LocateProbe("Steam", null, false, "Steam nicht installiert"));
+        else probes.Add(new LocateProbe("Steam", null, false, Localization.L.T("Steam nicht installiert")));
 
         // 3b) GOG (32- und 64-Bit-Registry)
         foreach (var keyPath in new[] { @"SOFTWARE\WOW6432Node\GOG.com\Games", @"SOFTWARE\GOG.com\Games" })

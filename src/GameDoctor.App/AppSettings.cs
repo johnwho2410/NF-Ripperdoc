@@ -9,6 +9,9 @@ public sealed class AppSettings
 {
     public string? Skin { get; set; }
 
+    /// <summary>„de“ oder „en“; null = beim ersten Start nach der Windows-Sprache wählen.</summary>
+    public string? Language { get; set; }
+
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public OverlayCorner OverlayCorner { get; set; } = OverlayCorner.TopLeft;
 

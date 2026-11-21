@@ -1,3 +1,5 @@
+using GameDoctor.Core.Localization;
+
 namespace GameDoctor.Core.Performance;
 
 public enum LiveAlertLevel { Info, Warning, Critical }
@@ -42,29 +44,29 @@ public sealed class LiveAdvisor
 
         // ---- Grafikspeicher
         if (s.VramUsedMb is double vu && s.VramTotalMb is double vt && vt > 0)
-            Check("vram", vu / vt >= 0.95, 5, LiveAlertLevel.Warning, "Grafikspeicher voll",
-                $"{vu / 1024:F1} von {vt / 1024:F1} GB belegt – Texturen werden nachgeladen. Texturqualität oder Raytracing senken.");
+            Check("vram", vu / vt >= 0.95, 5, LiveAlertLevel.Warning, L.T("Grafikspeicher voll"),
+                L.F("{0:F1} von {1:F1} GB belegt – Texturen werden nachgeladen. Texturqualität oder Raytracing senken.", vu / 1024, vt / 1024));
         else Reset("vram");
 
         // ---- Arbeitsspeicher und virtueller Speicher
         if (s.RamTotalGb > 0)
-            Check("ram", s.RamUsedGb / s.RamTotalGb >= 0.92, 5, LiveAlertLevel.Warning, "Arbeitsspeicher fast voll",
-                $"{s.RamUsedGb:F1} von {s.RamTotalGb:F0} GB – Windows lagert aus. Browser, Discord & Co. schließen.");
+            Check("ram", s.RamUsedGb / s.RamTotalGb >= 0.92, 5, LiveAlertLevel.Warning, L.T("Arbeitsspeicher fast voll"),
+                L.F("{0:F1} von {1:F0} GB – Windows lagert aus. Browser, Discord & Co. schließen.", s.RamUsedGb, s.RamTotalGb));
         if (s.CommitLimitGb > 0)
-            Check("commit", s.CommitUsedGb / s.CommitLimitGb >= 0.90, 3, LiveAlertLevel.Critical, "Virtueller Speicher knapp",
-                $"{s.CommitUsedGb:F0} von {s.CommitLimitGb:F0} GB zugesagt – Absturzgefahr. Auslagerungsdatei vergrößern oder Programme schließen.");
+            Check("commit", s.CommitUsedGb / s.CommitLimitGb >= 0.90, 3, LiveAlertLevel.Critical, L.T("Virtueller Speicher knapp"),
+                L.F("{0:F0} von {1:F0} GB zugesagt – Absturzgefahr. Auslagerungsdatei vergrößern oder Programme schließen.", s.CommitUsedGb, s.CommitLimitGb));
 
         // ---- Ruckler und Bildrate
-        Check("stutter", s.StuttersLast10s >= 5, 2, LiveAlertLevel.Warning, "Ruckler-Serie",
-            $"{s.StuttersLast10s} Ruckler in 10 Sekunden.");
+        Check("stutter", s.StuttersLast10s >= 5, 2, LiveAlertLevel.Warning, L.T("Ruckler-Serie"),
+            L.F("{0} Ruckler in 10 Sekunden.", s.StuttersLast10s));
         if (s.Fps is double fps)
-            Check("lowfps", fps < 30, 10, LiveAlertLevel.Info, "Bildrate unter 30",
-                $"Seit über 10 Sekunden nur {fps:F0} FPS" + (s.Bottleneck is { } b ? $" ({b})." : "."));
+            Check("lowfps", fps < 30, 10, LiveAlertLevel.Info, L.T("Bildrate unter 30"),
+                L.F("Seit über 10 Sekunden nur {0:F0} FPS", fps) + (s.Bottleneck is { } b ? $" ({b})." : "."));
 
         // ---- Temperatur
         if (s.GpuTempC is double t)
-            Check("gputemp", t >= 83, 10, LiveAlertLevel.Warning, "Grafikkarte sehr warm",
-                $"{t:F0} °C – ab etwa 83 °C taktet die Karte herunter. Lüfter und Gehäusebelüftung prüfen.");
+            Check("gputemp", t >= 83, 10, LiveAlertLevel.Warning, L.T("Grafikkarte sehr warm"),
+                L.F("{0:F0} °C – ab etwa 83 °C taktet die Karte herunter. Lüfter und Gehäusebelüftung prüfen.", t));
 
         // ---- Flaschenhals: nur melden, wenn er von einem stabilen Zustand in einen anderen wechselt.
         //      Ein dauerhaftes GPU-Limit ist der Normalfall und wird nicht gemeldet.
@@ -77,8 +79,8 @@ public sealed class LiveAdvisor
                 // Der erste stabile Zustand (und alles in der Aufwärmphase) wird nur gemerkt, nicht gemeldet.
                 // Gegen Hin-und-her-Springen schützt der Cooldown pro Zielzustand.
                 if (_stableBottleneck is not null)
-                    Emit("bottleneck:" + bn, LiveAlertLevel.Info, "Flaschenhals jetzt: " + bn,
-                        $"Vorher {_stableBottleneck}, seit 15 Sekunden durchgehend {bn}.");
+                    Emit("bottleneck:" + bn, LiveAlertLevel.Info, L.F("Flaschenhals jetzt: {0}", bn),
+                        L.F("Vorher {0}, seit 15 Sekunden durchgehend {1}.", _stableBottleneck, bn));
                 _stableBottleneck = bn;
             }
         }
