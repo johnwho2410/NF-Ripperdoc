@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using GameDoctor.Core.Analysis;
+using GameDoctor.Core.Community;
 using GameDoctor.Core.Games.Cyberpunk;
 using GameDoctor.Core.Performance;
 using GameDoctor.Core.Report;
@@ -43,6 +44,7 @@ public partial class MainWindow : Window
             var progress = new Progress<string>(msg => _vm.Status = msg);
             var result = await Task.Run(() => CrashAnalyzer.Run(options, ((IProgress<string>)progress).Report));
             _vm.Load(result);
+            await RefreshFixesAsync(result);
             _vm.Status = $"Analyse abgeschlossen: {result.Crashes.Count} Abstürze, {DateTime.Now:HH:mm} Uhr";
         }
         catch (Exception ex)
@@ -74,6 +76,59 @@ public partial class MainWindow : Window
         CrashPage.Visibility = Tabs.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
         PerfPage.Visibility = Tabs.SelectedIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
         EnvPage.Visibility = Tabs.SelectedIndex == 3 ? Visibility.Visible : Visibility.Collapsed;
+        FixPage.Visibility = Tabs.SelectedIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // ------------------------------------------------------------------ Lösungsversuche
+
+    private ModInventory _inventory = new();
+
+    /// <summary>Sitzungsprotokoll fortschreiben und alle Lösungsversuche neu bewerten.</summary>
+    private async Task RefreshFixesAsync(AnalysisResult result)
+    {
+        var vms = await Task.Run(() =>
+        {
+            _inventory = result.Install is null ? new ModInventory() : ModInventory.Load(result.Install.Root);
+            var ledger = PlaySessionLedger.Load();
+            ledger.Harvest(result.Install, result.Crashes);
+            try { ledger.Save(); } catch { /* nicht kritisch */ }
+            var evaluator = new FixEvaluator(result.Crashes, ledger, result.Install);
+            return FixAttemptStore.Load().Select(a => new FixAttemptViewModel(a, evaluator.Evaluate(a))).ToList();
+        });
+        _vm.SetFixes(vms);
+    }
+
+    private async void NewFix_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm.Result is not { } result || _vm.SelectedCrash?.Case is not { } crash) return;
+        var dlg = new FixAttemptWindow(crash, result, _inventory, new ModuleClassifier(result.Install?.Root)) { Owner = this };
+        if (dlg.ShowDialog() != true || dlg.Created is null) return;
+        FixAttemptStore.Upsert(dlg.Created);
+        await RefreshFixesAsync(result);
+        Tabs.SelectedIndex = 4;
+        _vm.Status = $"Lösungsversuch gestartet: {dlg.Created.TargetLabel}. Spiel jetzt ganz normal weiter – GameDoctor wertet bei jeder Analyse aus.";
+    }
+
+    private async void FixHelped_Click(object sender, RoutedEventArgs e) => await SetVerdict(sender, UserVerdict.Helped);
+    private async void FixNotHelped_Click(object sender, RoutedEventArgs e) => await SetVerdict(sender, UserVerdict.NotHelped);
+
+    private async Task SetVerdict(object sender, UserVerdict verdict)
+    {
+        if (sender is not FrameworkElement { Tag: Guid id } || _vm.Result is not { } result) return;
+        var attempt = FixAttemptStore.Load().FirstOrDefault(a => a.Id == id);
+        if (attempt is null) return;
+        // Ein zweiter Klick auf dieselbe Einschätzung nimmt sie zurück
+        var newVerdict = attempt.Verdict == verdict ? UserVerdict.None : verdict;
+        FixAttemptStore.Upsert(attempt with { Verdict = newVerdict, VerdictAt = newVerdict == UserVerdict.None ? null : DateTime.Now });
+        await RefreshFixesAsync(result);
+    }
+
+    private async void FixRemove_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: Guid id } || _vm.Result is not { } result) return;
+        if (MessageBox.Show(this, "Diesen Lösungsversuch entfernen?", "Entfernen", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        FixAttemptStore.Remove(id);
+        await RefreshFixesAsync(result);
     }
 
     // ------------------------------------------------------------------ Performance

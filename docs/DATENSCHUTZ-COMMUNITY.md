@@ -76,6 +76,22 @@ Liefert den Vergleichswert: Wie verbreitet ist eine Mod überhaupt? Ohne ihn wir
 verdächtig. Erst der Vergleich „bei Absturzstelle X haben 40 von 45 Spielern Mod Y, im Durchschnitt nur 8 %“ ergibt
 einen echten Verdacht.
 
+### Meldungsart D: „Maßnahme Y hat bei Absturzstelle X geholfen / nicht geholfen“
+
+```json
+{"Schema":1,"GameBuild":"3.0.5813403","Signature":"Cyberpunk2077.exe+0x4870C9","Action":"DisableMod","NexusModId":7203,"ModuleFile":null,"Outcome":"Helped","Evidence":"Auto","DedupKey":"bc2f4640…"}
+```
+
+Das wertvollste Signal der Datenbank: aus „Mod X ist verdächtig“ wird „Deaktivieren von Mod X hat bei N Spielern geholfen“.
+
+- **Nur öffentliche Ziele:** Nexus-ID, oder eine DLL, die im Aufrufpfad eines geteilten Absturzes lag (z. B. `Boneware.dll`,
+  steht ohnehin im Fingerabdruck). Einstellungs-Änderungen und alles mit Freitext werden **nicht** geteilt.
+- **Nur belastbare Ergebnisse:** automatisch erkannt (Absturzstelle kam wieder → „nicht geholfen“; ≥ 3 erwartete Abstürze
+  blieben aus → „geholfen“) oder Einschätzung des Nutzers, bei „geholfen“ erst nach ≥ 1 Stunde Spielzeit ohne Rückfall.
+- **Keine falschen Belege:** Waren alle bisherigen Abstürze an einen Ort in der Spielwelt gebunden, wird ein „geholfen“
+  nicht geteilt – der Spieler könnte den Ort einfach nicht mehr besucht haben.
+- **Nie geteilt:** Notizen, Zeitpunkte, Spielzeiten, das lokale Sitzungsprotokoll (`sessions.json`).
+
 ### Was nie übertragen wird
 
 Benutzername, PC-Name, Pfade, E-Mail, IP-Adressen, Steam-/Nexus-Konten, Uhrzeiten oder Datumsangaben, Crash-Dumps

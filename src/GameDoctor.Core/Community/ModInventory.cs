@@ -17,6 +17,10 @@ public sealed record InstalledMod(int NexusId, string? Version, string DisplayNa
 public sealed class ModInventory
 {
     private readonly Dictionary<string, InstalledMod> _byFile = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<int, List<string>> _filesById = [];
+
+    /// <summary>Dateinamen (ohne Pfad), die zu dieser Mod gehören.</summary>
+    public IReadOnlyList<string> FilesOf(int nexusId) => _filesById.TryGetValue(nexusId, out var l) ? l : [];
 
     public IReadOnlyList<InstalledMod> Mods { get; private init; } = [];
     public int PackagesWithoutId { get; private init; }
@@ -55,7 +59,12 @@ public sealed class ModInventory
                 Mods = bySource.Values.OfType<InstalledMod>().GroupBy(m => m.NexusId).Select(g => g.First()).OrderBy(m => m.NexusId).ToList(),
                 PackagesWithoutId = bySource.Values.Count(m => m is null),
             };
-            foreach (var (k, v) in inv) result._byFile[k] = v;
+            foreach (var (k, v) in inv)
+            {
+                result._byFile[k] = v;
+                if (!result._filesById.TryGetValue(v.NexusId, out var files)) result._filesById[v.NexusId] = files = [];
+                files.Add(k);
+            }
             return result;
         }
         catch

@@ -55,6 +55,7 @@
                     <TabItem Header="Abstürze"/>
                     <TabItem Header="Performance"/>
                     <TabItem Header="Mods &amp; System"/>
+                    <TabItem Header="Lösungen"/>
                 </TabControl>
             </Grid>
         </Border>
@@ -120,6 +121,8 @@
                     <StackPanel MaxWidth="1000" HorizontalAlignment="Stretch">
                         <DockPanel>
                             <Button DockPanel.Dock="Right" Content="Ordner öffnen" Click="OpenFolder_Click" VerticalAlignment="Center"/>
+                            <Button DockPanel.Dock="Right" Content="Lösung ausprobieren …" Click="NewFix_Click" VerticalAlignment="Center" Margin="0,0,8,0"
+                                    ToolTip="Eine Mod deaktivieren o. ä. – GameDoctor prüft danach automatisch, ob es geholfen hat"/>
                             <Button DockPanel.Dock="Right" Content="KI-Auswertung für diesen Absturz" Click="CrashPrompt_Click" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <StackPanel>
                                 <TextBlock Text="{Binding TimeText}" Style="{StaticResource H1}"/>
@@ -238,6 +241,61 @@
                         <TextBlock Text="Diagnose" Style="{StaticResource H2}"/>
                         <ItemsControl ItemsSource="{Binding Findings}" ItemTemplate="{StaticResource FindingTemplate}"/>
                     </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Lösungen -->
+            <ScrollViewer x:Name="FixPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="28,22,20,22">
+                <StackPanel MaxWidth="1200" HorizontalAlignment="Stretch">
+                    <TextBlock Text="Lösungsversuche" Style="{StaticResource H2}" Margin="0,0,0,4"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,0,0,14"
+                               Text="Hast du eine Mod deaktiviert oder etwas geändert, prüft GameDoctor hier automatisch, ob die Absturzstelle wiederkommt. Neue Versuche startest du im Tab „Abstürze“ mit „Lösung ausprobieren …“."/>
+
+                    <Border Background="{DynamicResource Panel}" CornerRadius="8" Padding="18,14"
+                            Visibility="{Binding NoFixes, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Style="{StaticResource Muted}" Text="Noch keine Lösungsversuche. Wähle im Tab „Abstürze“ einen Absturz und klicke auf „Lösung ausprobieren …“."/>
+                    </Border>
+
+                    <ItemsControl ItemsSource="{Binding Fixes}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource Panel}" CornerRadius="8" Margin="0,0,0,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="4"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Background="{Binding StatusBrush}" CornerRadius="8,0,0,8"/>
+                                        <StackPanel Grid.Column="1" Margin="16,12,16,14">
+                                            <DockPanel>
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                                    <Button Content="Hat geholfen" Tag="{Binding Id}" Click="FixHelped_Click" Margin="0,0,6,0" Padding="10,4"/>
+                                                    <Button Content="Hat nicht geholfen" Tag="{Binding Id}" Click="FixNotHelped_Click" Margin="0,0,6,0" Padding="10,4"/>
+                                                    <Button Content="Entfernen" Tag="{Binding Id}" Click="FixRemove_Click" Padding="10,4"/>
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding Headline}" Foreground="{Binding StatusBrush}" FontWeight="SemiBold" Margin="0,10,0,0"/>
+                                            <TextBlock Text="{Binding Detail}" Foreground="#C9CEDA" TextWrapping="Wrap" LineHeight="20" Margin="0,4,0,0"/>
+                                            <ProgressBar Value="{Binding Progress, Mode=OneWay}" Maximum="100" Height="6" Margin="0,10,0,0"
+                                                         Foreground="{DynamicResource Accent}" Background="{DynamicResource PanelHi}" BorderThickness="0"
+                                                         Visibility="{Binding ShowProgress, Converter={StaticResource BoolToVis}}"/>
+                                            <TextBlock Text="{Binding VerdictText}" Foreground="{DynamicResource Cyan}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                                       Visibility="{Binding VerdictText, Converter={StaticResource NullToCollapsed}}"/>
+                                            <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"
+                                                       Visibility="{Binding Note, Converter={StaticResource NullToCollapsed}}">
+                                                <Run Text="Notiz: "/><Run Text="{Binding Note, Mode=OneWay}"/>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding ShareText}" Style="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </ScrollViewer>
 

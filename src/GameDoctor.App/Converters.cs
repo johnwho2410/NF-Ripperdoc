@@ -14,6 +14,8 @@ public sealed class SeverityBrushConverter : IValueConverter
     private static readonly Brush Warning = Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x1C)));
     private static readonly Brush Hint = Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0xD6, 0x0A)));
     private static readonly Brush Info = Freeze(new SolidColorBrush(Color.FromRgb(0x5B, 0x9B, 0xD5)));
+    /// <summary>Grün für „erledigt / geholfen“.</summary>
+    public static readonly Brush Good = Freeze(new SolidColorBrush(Color.FromRgb(0x4A, 0xDE, 0x80)));
 
     private static Brush Freeze(Brush b) { b.Freeze(); return b; }
 

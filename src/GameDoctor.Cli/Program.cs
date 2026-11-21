@@ -29,16 +29,20 @@ if (args.Length > 0 && args[0] == "fingerprint")
     var secret = GameDoctor.Core.Community.FingerprintStore.GetOrCreateSecret();
     var inventory = res.Install is null ? new GameDoctor.Core.Community.ModInventory() : GameDoctor.Core.Community.ModInventory.Load(res.Install.Root);
     var builder = new GameDoctor.Core.Community.FingerprintBuilder(new ModuleClassifier(res.Install?.Root), secret, inventory);
-    var pkg = GameDoctor.Core.Community.CommunityPackage.Build(res, builder, inventory, secret);
+    var ledger = GameDoctor.Core.Games.Cyberpunk.PlaySessionLedger.Load();
+    ledger.Harvest(res.Install, res.Crashes);
+    var evaluator = new GameDoctor.Core.Community.FixEvaluator(res.Crashes, ledger, res.Install);
+    var fixes = GameDoctor.Core.Community.FixAttemptStore.Load().Select(a => (a, evaluator.Evaluate(a)));
+    var pkg = GameDoctor.Core.Community.CommunityPackage.Build(res, builder, inventory, secret, fixes);
 
     var json = System.Text.Json.JsonSerializer.Serialize(
-        new { pkg.Fingerprints, pkg.Pairs, pkg.Census }, GameDoctor.Core.Community.FingerprintBuilder.Json);
+        new { pkg.Fingerprints, pkg.Pairs, pkg.Census, pkg.FixOutcomes }, GameDoctor.Core.Community.FingerprintBuilder.Json);
     if (fOut is not null) File.WriteAllText(fOut, json, Encoding.UTF8);
 
     Console.WriteLine("Stufe 1 – was anonym geteilt würde:");
     Console.WriteLine($"  Mod-Inventar: {inventory.Mods.Count} öffentliche Mods (Nexus-ID){(inventory.FromVortex ? "" : " – kein Vortex-Manifest gefunden")}, {inventory.PackagesWithoutId} ohne ID ausgelassen");
     Console.WriteLine($"  {res.Crashes.Count} Abstürze → {pkg.Fingerprints.Count} Fingerabdrücke (je Absturzstelle einer), {pkg.UnusableCrashes} nicht auswertbar");
-    Console.WriteLine($"  {pkg.Pairs.Count:N0} Paar-Meldungen „Absturzstelle × installierte Mod“, {pkg.Census.Count} Verbreitungs-Meldungen");
+    Console.WriteLine($"  {pkg.Pairs.Count:N0} Paar-Meldungen „Absturzstelle × installierte Mod“, {pkg.Census.Count} Verbreitungs-Meldungen, {pkg.FixOutcomes.Count} Ergebnisse von Lösungsversuchen");
     Console.WriteLine($"  Vom Datenschutz-Wächter blockiert: {pkg.BlockedByGuard}");
     foreach (var v in pkg.Violations.Take(10)) Console.WriteLine($"    BLOCKIERT: {v.Rule} „{v.Match}“");
     Console.WriteLine($"  Größe: {Encoding.UTF8.GetByteCount(json) / 1024.0:F0} KB{(fOut is not null ? $" → {fOut}" : " (mit --out <datei> vollständig speichern)")}");

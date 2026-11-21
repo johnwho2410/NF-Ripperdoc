@@ -135,8 +135,82 @@ public sealed class PerformanceViewModel : ObservableObject
     }
 }
 
+/// <summary>Ein Lösungsversuch samt automatischer Bewertung – für den Tab „Lösungen“.</summary>
+public sealed class FixAttemptViewModel
+{
+    public FixAttemptViewModel(GameDoctor.Core.Community.FixAttempt a, GameDoctor.Core.Community.FixEvaluation ev)
+    {
+        Attempt = a;
+        Evaluation = ev;
+        var verb = a.Action switch
+        {
+            GameDoctor.Core.Community.FixAction.DisableMod => "deaktiviert",
+            GameDoctor.Core.Community.FixAction.UpdateMod => "aktualisiert",
+            GameDoctor.Core.Community.FixAction.ChangeSetting => "geändert",
+            _ => "ausprobiert",
+        };
+        Title = a.Action == GameDoctor.Core.Community.FixAction.ChangeSetting ? a.TargetLabel : $"„{a.TargetLabel}“ {verb}";
+        Subtitle = $"seit {a.StartedAt:dd.MM.yyyy HH:mm} · Absturzstelle {string.Join(", ", a.Signatures)}";
+        Headline = ev.Headline;
+        Detail = ev.Detail;
+        Progress = Math.Clamp(ev.Progress, 0, 1) * 100;
+        ShowProgress = ev.Status == GameDoctor.Core.Community.FixStatus.Waiting;
+        StatusBrush = ev.Status switch
+        {
+            GameDoctor.Core.Community.FixStatus.LikelyHelped => SeverityBrushConverter.Good,
+            GameDoctor.Core.Community.FixStatus.NotHelped => SeverityBrushConverter.For(Severity.Critical),
+            GameDoctor.Core.Community.FixStatus.ModStillInstalled => SeverityBrushConverter.For(Severity.Warning),
+            _ => SeverityBrushConverter.For(Severity.Info),
+        };
+        VerdictText = a.Verdict switch
+        {
+            GameDoctor.Core.Community.UserVerdict.Helped => $"Deine Einschätzung: hat geholfen ({a.VerdictAt:dd.MM.})",
+            GameDoctor.Core.Community.UserVerdict.NotHelped => $"Deine Einschätzung: hat nicht geholfen ({a.VerdictAt:dd.MM.})",
+            _ => null,
+        };
+        if (a.Verdict == GameDoctor.Core.Community.UserVerdict.Helped && ev.Status == GameDoctor.Core.Community.FixStatus.NotHelped)
+            VerdictText += " – die Absturzdaten sprechen allerdings dagegen.";
+        Note = a.Note;
+
+        var outcome = ev.ShareableOutcome(a);
+        bool publicTarget = a.NexusModId is not null || a.ModuleFile is not null;
+        ShareText = !publicTarget
+            ? "Wird nicht mit der Community geteilt (keine öffentliche Mod)."
+            : outcome is null
+                ? "Wird anonym geteilt, sobald das Ergebnis feststeht."
+                : $"Anonym teilbar als „{(outcome == "Helped" ? "hat geholfen" : "hat nicht geholfen")}“.";
+    }
+
+    public GameDoctor.Core.Community.FixAttempt Attempt { get; }
+    public GameDoctor.Core.Community.FixEvaluation Evaluation { get; }
+    public Guid Id => Attempt.Id;
+    public string Title { get; }
+    public string Subtitle { get; }
+    public string Headline { get; }
+    public string Detail { get; }
+    public double Progress { get; }
+    public bool ShowProgress { get; }
+    public Brush StatusBrush { get; }
+    public string? VerdictText { get; }
+    public string? Note { get; }
+    public string ShareText { get; }
+}
+
 public sealed class MainViewModel : ObservableObject
 {
+    private bool _hasFixes;
+
+    public ObservableCollection<FixAttemptViewModel> Fixes { get; } = [];
+    public bool HasFixes { get => _hasFixes; set { if (Set(ref _hasFixes, value)) Raise(nameof(NoFixes)); } }
+    public bool NoFixes => !_hasFixes;
+
+    public void SetFixes(IEnumerable<FixAttemptViewModel> fixes)
+    {
+        Fixes.Clear();
+        foreach (var f in fixes) Fixes.Add(f);
+        HasFixes = Fixes.Count > 0;
+    }
+
     public PerformanceViewModel Perf { get; } = new();
 
     private bool _isBusy;
