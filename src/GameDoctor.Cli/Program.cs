@@ -21,25 +21,35 @@ if (args.Length > 0 && args[0] == "fingerprint")
     for (int i = 1; i < args.Length; i++)
         if (args[i] == "--days") fDays = int.Parse(args[++i]);
 
+    string? fOut = null;
+    for (int i = 1; i < args.Length; i++)
+        if (args[i] == "--out") fOut = args[++i];
+
     var res = CrashAnalyzer.Run(new CrashAnalyzerOptions { Days = fDays });
-    var builder = new GameDoctor.Core.Community.FingerprintBuilder(
-        new ModuleClassifier(res.Install?.Root), GameDoctor.Core.Community.FingerprintStore.GetOrCreateSecret());
+    var secret = GameDoctor.Core.Community.FingerprintStore.GetOrCreateSecret();
+    var inventory = res.Install is null ? new GameDoctor.Core.Community.ModInventory() : GameDoctor.Core.Community.ModInventory.Load(res.Install.Root);
+    var builder = new GameDoctor.Core.Community.FingerprintBuilder(new ModuleClassifier(res.Install?.Root), secret, inventory);
+    var pkg = GameDoctor.Core.Community.CommunityPackage.Build(res, builder, inventory, secret);
 
-    var fps = new List<GameDoctor.Core.Community.CrashFingerprint>();
-    int blocked = 0, unusable = 0;
-    foreach (var c in res.Crashes)
-    {
-        var fp = builder.TryBuild(c, res, out var violations);
-        if (fp is not null) { fps.Add(fp); continue; }
-        if (violations.Count == 0) { unusable++; continue; }
-        blocked++;
-        Console.Error.WriteLine($"BLOCKIERT ({c.Report.Time:dd.MM. HH:mm}): {string.Join(", ", violations.Select(v => $"{v.Rule} „{v.Match}“"))}");
-    }
+    var json = System.Text.Json.JsonSerializer.Serialize(
+        new { pkg.Fingerprints, pkg.Pairs, pkg.Census }, GameDoctor.Core.Community.FingerprintBuilder.Json);
+    if (fOut is not null) File.WriteAllText(fOut, json, Encoding.UTF8);
 
-    var distinct = fps.GroupBy(f => f.DedupKey).Select(g => g.First()).ToList();
-    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(distinct, GameDoctor.Core.Community.FingerprintBuilder.Json));
-    Console.Error.WriteLine($"{res.Crashes.Count} Abstürze → {fps.Count} Fingerabdrücke, davon {distinct.Count} verschieden (Doppelzähl-Schutz), {unusable} ohne auswertbaren Dump, {blocked} vom Datenschutz-Wächter blockiert.");
-    if (save) Console.Error.WriteLine($"Lokal gespeichert: {GameDoctor.Core.Community.FingerprintStore.Merge(distinct)} neu in {GameDoctor.Core.Community.FingerprintStore.Dir}");
+    Console.WriteLine("Stufe 1 – was anonym geteilt würde:");
+    Console.WriteLine($"  Mod-Inventar: {inventory.Mods.Count} öffentliche Mods (Nexus-ID){(inventory.FromVortex ? "" : " – kein Vortex-Manifest gefunden")}, {inventory.PackagesWithoutId} ohne ID ausgelassen");
+    Console.WriteLine($"  {res.Crashes.Count} Abstürze → {pkg.Fingerprints.Count} Fingerabdrücke (je Absturzstelle einer), {pkg.UnusableCrashes} nicht auswertbar");
+    Console.WriteLine($"  {pkg.Pairs.Count:N0} Paar-Meldungen „Absturzstelle × installierte Mod“, {pkg.Census.Count} Verbreitungs-Meldungen");
+    Console.WriteLine($"  Vom Datenschutz-Wächter blockiert: {pkg.BlockedByGuard}");
+    foreach (var v in pkg.Violations.Take(10)) Console.WriteLine($"    BLOCKIERT: {v.Rule} „{v.Match}“");
+    Console.WriteLine($"  Größe: {Encoding.UTF8.GetByteCount(json) / 1024.0:F0} KB{(fOut is not null ? $" → {fOut}" : " (mit --out <datei> vollständig speichern)")}");
+    Console.WriteLine();
+    Console.WriteLine("Beispiele (je eine Meldung, so wie sie gesendet würde):");
+    var opts = new System.Text.Json.JsonSerializerOptions();
+    if (pkg.Fingerprints.FirstOrDefault() is { } f1) Console.WriteLine("  " + System.Text.Json.JsonSerializer.Serialize(f1, opts));
+    if (pkg.Pairs.FirstOrDefault() is { } p1) Console.WriteLine("  " + System.Text.Json.JsonSerializer.Serialize(p1, opts));
+    if (pkg.Census.FirstOrDefault() is { } c1) Console.WriteLine("  " + System.Text.Json.JsonSerializer.Serialize(c1, opts));
+
+    if (save) Console.WriteLine($"Fingerabdrücke lokal gespeichert: {GameDoctor.Core.Community.FingerprintStore.Merge(pkg.Fingerprints)} neu in {GameDoctor.Core.Community.FingerprintStore.Dir}");
     return;
 }
 

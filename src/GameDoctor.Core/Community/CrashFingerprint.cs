@@ -51,4 +51,8 @@ public sealed record CrashFingerprint
     public required string DedupKey { get; init; }
 }
 
-public sealed record FingerprintModule(string File, string? Version, string Kind);
+public sealed record FingerprintModule(string File, string? Version, string Kind)
+{
+    /// <summary>Öffentliche Nexus-Mod-ID, falls bekannt (aus Vortex).</summary>
+    public int? NexusModId { get; init; }
+}

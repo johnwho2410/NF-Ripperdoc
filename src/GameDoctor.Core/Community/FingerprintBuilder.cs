@@ -12,11 +12,13 @@ public sealed class FingerprintBuilder
 {
     private readonly ModuleClassifier _classifier;
     private readonly byte[] _secret;
+    private readonly ModInventory? _inventory;
 
-    public FingerprintBuilder(ModuleClassifier classifier, byte[] secret)
+    public FingerprintBuilder(ModuleClassifier classifier, byte[] secret, ModInventory? inventory = null)
     {
         _classifier = classifier;
         _secret = secret;
+        _inventory = inventory;
     }
 
     public static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
@@ -96,7 +98,11 @@ public sealed class FingerprintBuilder
             .Select(h => h.Module)
             .Where(m => _classifier.Classify(m) is ModuleKind.Mod or ModuleKind.ModFramework or ModuleKind.Overlay)
             .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(g => new FingerprintModule(CleanFileName(g.Key), CleanVersion(g.First().FileVersion), _classifier.Classify(g.First()).ToString()))
+            .Select(g => new FingerprintModule(CleanFileName(g.Key), CleanVersion(g.First().FileVersion), _classifier.Classify(g.First()).ToString())
+            {
+                // Öffentliche Nexus-ID, falls die DLL aus einem Nexus-Paket stammt
+                NexusModId = _inventory?.ForFile(g.Key)?.NexusId,
+            })
             .ToList();
 
     /// <summary>Nur der Dateiname, ohne unsichtbare Steuerzeichen.</summary>
@@ -150,10 +156,5 @@ public sealed class FingerprintBuilder
         return n switch { < 50 => "<50", < 150 => "50-149", < 300 => "150-299", _ => "300+" };
     }
 
-    private string DedupKey(string build, string signature)
-    {
-        using var hmac = new HMACSHA256(_secret);
-        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes($"{build}|{signature}"));
-        return Convert.ToHexString(hash, 0, 12).ToLowerInvariant();
-    }
+    private string DedupKey(string build, string signature) => CommunityKeys.Derive(_secret, $"{build}|{signature}");
 }
