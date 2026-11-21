@@ -62,6 +62,24 @@ public sealed class PageFileInfo
             : $"{f.Drive} fest: Start {f.InitialMb / 1024.0:F0} GB, maximal {f.MaximumMb / 1024.0:F0} GB"));
     }
 
+    /// <summary>
+    /// Kann die Auslagerungsdatei auf diesem Laufwerk (z. B. "C:") wachsen und braucht dort also freien Platz?
+    /// Bei vollautomatischer Verwaltung legt Windows sie auf das Systemlaufwerk.
+    /// </summary>
+    public bool CanGrowOn(string drive, string systemDrive = "C:")
+    {
+        drive = Norm(drive);
+        if (Disabled) return false;
+        if (FullyAutomatic) return drive == Norm(systemDrive);
+        return Files.Any(f => f.Drive == drive && (f.SystemManaged || f.MaximumMb > f.InitialMb));
+    }
+
+    /// <summary>Laufwerke, auf denen eine Auslagerungsdatei liegt (bei vollautomatischer Verwaltung das Systemlaufwerk).</summary>
+    public IReadOnlyList<string> Drives(string systemDrive = "C:") =>
+        Disabled ? [] : FullyAutomatic ? [Norm(systemDrive)] : Files.Select(f => f.Drive).Distinct().ToList();
+
+    private static string Norm(string drive) => drive.TrimEnd('\\').ToUpperInvariant();
+
     /// <summary>Startgröße der festen Auslagerungsdatei(en) in MB, 0 bei automatischer Verwaltung.</summary>
     public int FixedInitialMb => FullyAutomatic ? 0 : Files.Where(f => !f.SystemManaged).Sum(f => f.InitialMb);
 }

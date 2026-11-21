@@ -4,241 +4,247 @@
              xmlns:local="clr-namespace:GameDoctor.App"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-        <!-- ===== Farben ===== -->
-        <Color x:Key="BgColor">#0E1016</Color>
-        <Color x:Key="PanelColor">#171A23</Color>
-        <Color x:Key="PanelHiColor">#1F2330</Color>
-        <Color x:Key="LineColor">#2A2F3E</Color>
-        <Color x:Key="TextColor">#E6E8EE</Color>
-        <Color x:Key="MutedColor">#8A93A6</Color>
-        <Color x:Key="AccentColor">#FCEE0A</Color>
-        <Color x:Key="CyanColor">#00E0F0</Color>
+        <ResourceDictionary>
+            <!-- ===== Skin =====
+                 Das ERSTE Wörterbuch ist immer der Skin (Farben, Formen, Schriften). ThemeManager tauscht es zur Laufzeit aus.
+                 Deshalb werden Skin-Werte überall per DynamicResource eingebunden, nie per StaticResource. -->
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Cyberpunk.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
 
-        <SolidColorBrush x:Key="Bg" Color="{StaticResource BgColor}"/>
-        <SolidColorBrush x:Key="Panel" Color="{StaticResource PanelColor}"/>
-        <SolidColorBrush x:Key="PanelHi" Color="{StaticResource PanelHiColor}"/>
-        <SolidColorBrush x:Key="Line" Color="{StaticResource LineColor}"/>
-        <SolidColorBrush x:Key="Text" Color="{StaticResource TextColor}"/>
-        <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource MutedColor}"/>
-        <SolidColorBrush x:Key="Accent" Color="{StaticResource AccentColor}"/>
-        <SolidColorBrush x:Key="Cyan" Color="{StaticResource CyanColor}"/>
-        <SolidColorBrush x:Key="Good" Color="#4ADE80"/>
+            <local:SeverityBrushConverter x:Key="SeverityBrush"/>
+            <local:SeverityLabelConverter x:Key="SeverityLabel"/>
+            <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+            <local:NullToCollapsedConverter x:Key="NullToCollapsed"/>
+            <local:ShareToStarConverter x:Key="ShareToStar"/>
 
-        <local:SeverityBrushConverter x:Key="SeverityBrush"/>
-        <local:SeverityLabelConverter x:Key="SeverityLabel"/>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <local:NullToCollapsedConverter x:Key="NullToCollapsed"/>
-        <local:ShareToStarConverter x:Key="ShareToStar"/>
+            <!-- Karte / Panel in der Form des Skins -->
+            <Style x:Key="Card" TargetType="local:ShapeBorder">
+                <Setter Property="Background" Value="{DynamicResource Panel}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PanelEdge}"/>
+                <Setter Property="BorderThickness" Value="{DynamicResource PanelEdgeThickness}"/>
+                <Setter Property="CornerRadius" Value="{DynamicResource ShapeCorner}"/>
+                <Setter Property="Chamfer" Value="{DynamicResource ShapeChamfer}"/>
+                <Setter Property="EdgeAccent" Value="{DynamicResource EdgeAccent}"/>
+            </Style>
 
-        <!-- Kachel mit Kennzahl (Übersicht, Performance) -->
-        <DataTemplate x:Key="StatTileTemplate">
-            <Border Background="{StaticResource Panel}" CornerRadius="8" Padding="18,14" Margin="0,0,12,0">
-                <StackPanel>
-                    <TextBlock Text="{Binding Value}" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource Accent}" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Text="{Binding Label}" Foreground="{StaticResource MutedBrush}"/>
-                    <TextBlock Text="{Binding Sub}" Margin="0,6,0,0" FontFamily="Consolas, Segoe UI" FontSize="12"
-                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Sub}"
-                               Visibility="{Binding Sub, Converter={StaticResource NullToCollapsed}}"/>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
-
-        <!-- ===== Grundstile =====
-             Bewusst KEIN impliziter TextBlock-Stil: der würde auch die Texte in Buttons/Tabs überschreiben.
-             Die Textfarbe erbt sich stattdessen vom Fenster. -->
-        <Style x:Key="Body" TargetType="TextBlock">
-            <Setter Property="TextWrapping" Value="Wrap"/>
-        </Style>
-
-        <Style x:Key="H1" TargetType="TextBlock" BasedOn="{StaticResource Body}">
-            <Setter Property="FontSize" Value="22"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-        </Style>
-        <Style x:Key="H2" TargetType="TextBlock" BasedOn="{StaticResource Body}">
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,18,0,8"/>
-        </Style>
-        <Style x:Key="Muted" TargetType="TextBlock" BasedOn="{StaticResource Body}">
-            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
-        </Style>
-
-        <!-- Button -->
-        <Style TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
-            <Setter Property="Background" Value="{StaticResource PanelHi}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
-            <Setter Property="Padding" Value="14,7"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="b" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="1" CornerRadius="6" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="b" Property="BorderBrush" Value="{StaticResource Cyan}"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="b" Property="Opacity" Value="0.45"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="{StaticResource Accent}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
-            <Setter Property="Foreground" Value="#111"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-        </Style>
-
-        <!-- Zeitraum-Auswahl als Segment-Buttons -->
-        <Style x:Key="Segment" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="b" Background="Transparent" CornerRadius="5" Padding="10,5">
-                            <ContentPresenter/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="{StaticResource PanelHi}"/>
-                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Tabs -->
-        <Style TargetType="TabControl">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-        </Style>
-        <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TabItem">
-                        <Grid Margin="0,0,24,0">
-                            <ContentPresenter ContentSource="Header" Margin="0,10,0,10"/>
-                            <Border x:Name="u" Height="2" VerticalAlignment="Bottom" Background="Transparent"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="u" Property="Background" Value="{StaticResource Accent}"/>
-                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource Text}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Absturzliste -->
-        <Style x:Key="CrashListItem" TargetType="ListBoxItem">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="b" Background="Transparent" CornerRadius="6" Padding="10,8" Margin="0,0,0,2">
-                            <ContentPresenter/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="{StaticResource PanelHi}"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="{StaticResource PanelHi}"/>
-                                <Setter TargetName="b" Property="BorderBrush" Value="{StaticResource Cyan}"/>
-                                <Setter TargetName="b" Property="BorderThickness" Value="1"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Schlanke Scrollbar -->
-        <Style TargetType="ScrollBar">
-            <Setter Property="Width" Value="8"/>
-            <Setter Property="MinWidth" Value="8"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ScrollBar">
-                        <Track x:Name="PART_Track" IsDirectionReversed="True">
-                            <Track.Thumb>
-                                <Thumb>
-                                    <Thumb.Template>
-                                        <ControlTemplate TargetType="Thumb">
-                                            <Border Background="{StaticResource Line}" CornerRadius="4" Margin="1"/>
-                                        </ControlTemplate>
-                                    </Thumb.Template>
-                                </Thumb>
-                            </Track.Thumb>
-                        </Track>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="Orientation" Value="Horizontal">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Karte für eine Erkenntnis -->
-        <DataTemplate x:Key="FindingTemplate">
-            <Border Background="{StaticResource Panel}" CornerRadius="8" Margin="0,0,0,10" Padding="0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="4"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Border Background="{Binding Severity, Converter={StaticResource SeverityBrush}}" CornerRadius="8,0,0,8"/>
-                    <StackPanel Grid.Column="1" Margin="16,12,16,14">
-                        <StackPanel Orientation="Horizontal">
-                            <Border Background="{Binding Severity, Converter={StaticResource SeverityBrush}}" CornerRadius="3" Padding="6,1" Margin="0,0,10,0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Severity, Converter={StaticResource SeverityLabel}}" Foreground="#111" FontSize="11" FontWeight="SemiBold"/>
-                            </Border>
-                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding Detail}" Margin="0,8,0,0" Foreground="#C9CEDA" LineHeight="20" TextWrapping="Wrap"/>
-                        <ItemsControl ItemsSource="{Binding Evidence}" Margin="0,6,0,0"
-                                      Visibility="{Binding Evidence, Converter={StaticResource NullToCollapsed}}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <DockPanel Margin="0,2,0,0">
-                                        <TextBlock DockPanel.Dock="Left" Text="•" Foreground="{StaticResource Cyan}" Margin="4,0,8,0"/>
-                                        <TextBlock Text="{Binding}" Foreground="#C9CEDA" FontFamily="Consolas, Segoe UI" FontSize="12.5" TextWrapping="Wrap"/>
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <Border Background="#14271D" CornerRadius="5" Padding="10,7" Margin="0,10,0,0"
-                                Visibility="{Binding Recommendation, Converter={StaticResource NullToCollapsed}}">
-                            <DockPanel>
-                                <TextBlock DockPanel.Dock="Left" Text="➜" Foreground="{StaticResource Good}" Margin="0,0,8,0" FontWeight="Bold"/>
-                                <TextBlock Text="{Binding Recommendation}" Foreground="#BFF0CF" TextWrapping="Wrap"/>
-                            </DockPanel>
-                        </Border>
+            <!-- Kachel mit Kennzahl (Übersicht, Performance) -->
+            <DataTemplate x:Key="StatTileTemplate">
+                <local:ShapeBorder Style="{StaticResource Card}" Padding="18,14" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Text="{Binding Value}" FontSize="28" FontWeight="SemiBold" FontFamily="{DynamicResource HeadFont}"
+                                   Foreground="{DynamicResource Accent}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding Label}" Foreground="{DynamicResource MutedBrush}"/>
+                        <TextBlock Text="{Binding Sub}" Margin="0,6,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="12"
+                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Sub}"
+                                   Visibility="{Binding Sub, Converter={StaticResource NullToCollapsed}}"/>
                     </StackPanel>
-                </Grid>
-            </Border>
-        </DataTemplate>
+                </local:ShapeBorder>
+            </DataTemplate>
+
+            <!-- ===== Grundstile =====
+                 Bewusst KEIN impliziter TextBlock-Stil: der würde auch die Texte in Buttons/Tabs überschreiben.
+                 Die Textfarbe erbt sich stattdessen vom Fenster. -->
+            <Style x:Key="Body" TargetType="TextBlock">
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+
+            <Style x:Key="H1" TargetType="TextBlock" BasedOn="{StaticResource Body}">
+                <Setter Property="FontSize" Value="22"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="FontFamily" Value="{DynamicResource HeadFont}"/>
+            </Style>
+            <Style x:Key="H2" TargetType="TextBlock" BasedOn="{StaticResource Body}">
+                <Setter Property="FontSize" Value="15"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="FontFamily" Value="{DynamicResource HeadFont}"/>
+                <Setter Property="Margin" Value="0,18,0,8"/>
+            </Style>
+            <Style x:Key="Muted" TargetType="TextBlock" BasedOn="{StaticResource Body}">
+                <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
+            </Style>
+
+            <!-- Button -->
+            <Style TargetType="Button">
+                <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+                <Setter Property="Background" Value="{DynamicResource PanelHi}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+                <Setter Property="Padding" Value="14,7"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <local:ShapeBorder x:Name="b" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                               BorderThickness="1" CornerRadius="{DynamicResource ShapeCornerSmall}" Chamfer="{DynamicResource ShapeChamferSmall}"
+                                               Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </local:ShapeBorder>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Cyan}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="b" Property="Opacity" Value="0.45"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                <Setter Property="Background" Value="{DynamicResource Accent}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                <Setter Property="Foreground" Value="{DynamicResource OnAccent}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+            </Style>
+
+            <!-- Zeitraum-Auswahl als Segment-Buttons -->
+            <Style x:Key="Segment" TargetType="RadioButton">
+                <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Border x:Name="b" Background="Transparent" CornerRadius="{DynamicResource CornerS}" Padding="10,5">
+                                <ContentPresenter/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="b" Property="Background" Value="{DynamicResource PanelHi}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Tabs -->
+            <Style TargetType="TabControl">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+            </Style>
+            <Style TargetType="TabItem">
+                <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="FontFamily" Value="{DynamicResource HeadFont}"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Grid Margin="0,0,24,0">
+                                <ContentPresenter ContentSource="Header" Margin="0,10,0,10"/>
+                                <Border x:Name="u" Height="2" VerticalAlignment="Bottom" Background="Transparent"/>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="u" Property="Background" Value="{DynamicResource Accent}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Absturzliste -->
+            <Style x:Key="CrashListItem" TargetType="ListBoxItem">
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <local:ShapeBorder x:Name="b" Background="Transparent" CornerRadius="{DynamicResource ShapeCornerSmall}"
+                                               Chamfer="{DynamicResource ShapeChamferSmall}" Padding="10,8" Margin="0,0,0,2">
+                                <ContentPresenter/>
+                            </local:ShapeBorder>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="b" Property="Background" Value="{DynamicResource PanelHi}"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="b" Property="Background" Value="{DynamicResource PanelHi}"/>
+                                    <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Cyan}"/>
+                                    <Setter TargetName="b" Property="BorderThickness" Value="1"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Schlanke Scrollbar -->
+            <Style TargetType="ScrollBar">
+                <Setter Property="Width" Value="8"/>
+                <Setter Property="MinWidth" Value="8"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ScrollBar">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Background="{DynamicResource Line}" CornerRadius="{DynamicResource CornerS}" Margin="1"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="Orientation" Value="Horizontal">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- Karte für eine Erkenntnis -->
+            <DataTemplate x:Key="FindingTemplate">
+                <local:ShapeBorder Style="{StaticResource Card}" Margin="0,0,0,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <!-- Farbleiste links; die Karte schneidet sie auf ihre Form zu -->
+                        <Border Background="{Binding Severity, Converter={StaticResource SeverityBrush}}"/>
+                        <StackPanel Grid.Column="1" Margin="16,12,16,14">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="{Binding Severity, Converter={StaticResource SeverityBrush}}" CornerRadius="{DynamicResource CornerS}" Padding="6,1" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Severity, Converter={StaticResource SeverityLabel}}" Foreground="#111" FontSize="11" FontWeight="SemiBold"/>
+                                </Border>
+                                <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" FontFamily="{DynamicResource HeadFont}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding Detail}" Margin="0,8,0,0" Foreground="{DynamicResource TextSoft}" LineHeight="20" TextWrapping="Wrap"/>
+                            <ItemsControl ItemsSource="{Binding Evidence}" Margin="0,6,0,0"
+                                          Visibility="{Binding Evidence, Converter={StaticResource NullToCollapsed}}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,2,0,0">
+                                            <TextBlock DockPanel.Dock="Left" Text="•" Foreground="{DynamicResource Cyan}" Margin="4,0,8,0"/>
+                                            <TextBlock Text="{Binding}" Foreground="{DynamicResource TextSoft}" FontFamily="{DynamicResource MonoFont}" FontSize="12.5" TextWrapping="Wrap"/>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Background="{DynamicResource RecommendBg}" CornerRadius="{DynamicResource CornerS}" Padding="10,7" Margin="0,10,0,0"
+                                    Visibility="{Binding Recommendation, Converter={StaticResource NullToCollapsed}}">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Left" Text="➜" Foreground="{DynamicResource Good}" Margin="0,0,8,0" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding Recommendation}" Foreground="{DynamicResource RecommendText}" TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </local:ShapeBorder>
+            </DataTemplate>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

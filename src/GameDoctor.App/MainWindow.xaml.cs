@@ -242,9 +242,30 @@ public partial class MainWindow : Window
     // ------------------------------------------------------------------ Performance
 
     private PerformanceRecorder? _recorder;
+    private OverlayController _overlay = null!;
 
     private void InitPerformance()
     {
+        // ---- Ingame-Overlay
+        _overlay = new OverlayController(this)
+        {
+            // Das Overlay braucht Live-Werte: läuft keine Aufnahme, wird eine gestartet.
+            EnsureLiveData = () =>
+            {
+                if (OverlayController.WindowModeProblem(CyberpunkSettings.TryLoad()?.WindowMode) is { } problem)
+                {
+                    var answer = MessageBox.Show(this, problem + "\n\nOverlay trotzdem einblenden?", "Ingame-Overlay",
+                        MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                    if (answer != MessageBoxResult.Yes) return false;
+                }
+                if (_recorder is null) StartRecording();
+                return true;
+            },
+        };
+        _overlay.VisibilityChanged += visible => _vm.Perf.OverlayVisible = visible;
+        _vm.Perf.OverlayCorner = _overlay.Corner;
+        Closed += (_, _) => _overlay.Dispose();
+
         _vm.Perf.PresentMonAvailable = PresentMonTool.Find() is not null;
         _vm.Perf.Hint = "Starte die Aufnahme, wechsle ins Spiel und spiele 2–5 Minuten. Danach hier auf „Aufnahme beenden“.";
         Closing += (_, _) =>
@@ -291,25 +312,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private void StartRecording()
+    {
+        var perf = _vm.Perf;
+        // Entwickler-Schalter: anderes Programm messen (z. B. zum Testen ohne Spiel)
+        var process = Environment.GetEnvironmentVariable("GAMEDOCTOR_PERF_PROCESS") ?? "Cyberpunk2077.exe";
+        _recorder = new PerformanceRecorder(process);
+        _recorder.LiveUpdated += s => Dispatcher.BeginInvoke(() =>
+        {
+            perf.ShowLive(s);
+            _overlay.OnLive(s);
+        });
+        _recorder.Start();
+        perf.IsRecording = true;
+        perf.Hint = "Aufnahme läuft …";
+        _vm.Status = "Performance-Aufnahme gestartet";
+    }
+
     private void Record_Click(object sender, RoutedEventArgs e)
     {
         var perf = _vm.Perf;
         if (_recorder is null)
         {
-            // Entwickler-Schalter: anderes Programm messen (z. B. zum Testen ohne Spiel)
-            var process = Environment.GetEnvironmentVariable("GAMEDOCTOR_PERF_PROCESS") ?? "Cyberpunk2077.exe";
-            _recorder = new PerformanceRecorder(process);
-            _recorder.LiveUpdated += s => Dispatcher.BeginInvoke(() => perf.ShowLive(s));
-            _recorder.Start();
-            perf.IsRecording = true;
-            perf.Hint = "Aufnahme läuft …";
-            _vm.Status = "Performance-Aufnahme gestartet";
+            StartRecording();
             return;
         }
 
         var recording = _recorder.Stop();
         _recorder.Dispose();
         _recorder = null;
+        _overlay.Hide(); // ohne Messung hätte das Overlay nur veraltete Werte
         perf.IsRecording = false;
         string saved = "";
         if (recording.Frames.Count > 0 || recording.Sensors.Count > 0)
@@ -319,6 +351,15 @@ public partial class MainWindow : Window
         }
         ShowRecording(recording, $"Aufnahme beendet: {recording.Duration:mm\\:ss} min.");
         _vm.Status = perf.Hint + saved;
+    }
+
+    private void Overlay_Click(object sender, RoutedEventArgs e) => _overlay.Toggle();
+
+    private void OverlayCorner_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_overlay is null || sender is not RadioButton { Tag: string tag } || !Enum.TryParse<OverlayCorner>(tag, out var corner)) return;
+        _overlay.Corner = corner;
+        _vm.Perf.OverlayCorner = corner;
     }
 
     private async void DownloadPresentMon_Click(object sender, RoutedEventArgs e)
@@ -373,6 +414,30 @@ public partial class MainWindow : Window
     {
         if (_vm.Result is null) return;
         new PromptWindow(_vm.Result, focus, _vm.Perf.LastReport) { Owner = this }.Show();
+    }
+
+    // ------------------------------------------------------------------ Skin
+
+    private void Skin_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu
+        {
+            PlacementTarget = SkinButton,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+        };
+        foreach (var skin in ThemeManager.Skins)
+        {
+            var item = new MenuItem
+            {
+                Header = skin.Name,
+                ToolTip = skin.Description,
+                IsCheckable = true,
+                IsChecked = skin.Id == ThemeManager.Current.Id,
+            };
+            item.Click += (_, _) => ThemeManager.Apply(skin.Id);
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
     }
 
     private void UseDarkTitleBar() => DarkTitleBar.Apply(this);

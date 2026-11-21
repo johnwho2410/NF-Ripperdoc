@@ -582,7 +582,7 @@ public static class CrashAnalyzer
                         "Im BIOS prüfen, ob das XMP/DOCP-Profil aktiv ist. Ist der RAM selbst nur für diesen Takt spezifiziert, bringt schnellerer RAM spürbar mehr FPS.") { Category = "Performance" });
             }
 
-            // Freier Platz auf C: (Auslagerungsdatei, Shader-Cache)
+            // Freier Platz auf C: (Shader-Cache immer; Auslagerungsdatei nur, wenn sie dort liegt und wachsen kann)
             if (sys.TryGetProperty("Drives", out var drives))
             {
                 foreach (var dr in drives.EnumerateArray())
@@ -591,10 +591,7 @@ public static class CrashAnalyzer
                     long free = dr.GetProperty("AvailableFreeSpace").GetInt64();
                     long size = dr.GetProperty("TotalSize").GetInt64();
                     if (name?.StartsWith("C", StringComparison.OrdinalIgnoreCase) == true && free < 25L * 1024 * 1024 * 1024)
-                        result.EnvironmentFindings.Add(new Finding(free < 10L * 1024 * 1024 * 1024 ? Severity.Warning : Severity.Hint,
-                            $"Wenig Platz auf C: ({free / 1024d / 1024 / 1024:F0} GB frei von {size / 1024d / 1024 / 1024:F0} GB)",
-                            "Die Auslagerungsdatei und der Shader-Cache liegen auf C:. Ist der Platz knapp, kann Windows den virtuellen Speicher nicht vergrößern – das führt zu Abstürzen ohne klare Fehlermeldung.",
-                            "Mindestens 25–30 GB auf C: freihalten.") { Category = "System" });
+                        result.EnvironmentFindings.Add(LowSpaceOnC(free, size, PageFileInfo.Read()));
                 }
 
                 // Liegt das Spiel auf einer HDD?
@@ -621,5 +618,30 @@ public static class CrashAnalyzer
         {
             // sysinfo.json in unerwartetem Format – Systemregeln überspringen
         }
+    }
+
+    /// <summary>
+    /// Hinweis „wenig Platz auf C:“. Was dort knapp wird, hängt davon ab, wo die Auslagerungsdatei liegt:
+    /// Nur wenn sie auf C: liegt UND wachsen darf, droht ein Absturz durch fehlenden virtuellen Speicher.
+    /// Der Shader-Cache des Grafiktreibers liegt dagegen immer auf C:.
+    /// </summary>
+    public static Finding LowSpaceOnC(long freeBytes, long sizeBytes, PageFileInfo pageFile)
+    {
+        const double Gb = 1024d * 1024 * 1024;
+        string title = $"Wenig Platz auf C: ({freeBytes / Gb:F0} GB frei von {sizeBytes / Gb:F0} GB)";
+
+        if (pageFile.CanGrowOn("C:"))
+            return new Finding(freeBytes < 10 * Gb ? Severity.Warning : Severity.Hint, title,
+                "Die Auslagerungsdatei und der Shader-Cache liegen auf C:. Ist der Platz knapp, kann Windows den virtuellen Speicher nicht vergrößern – das führt zu Abstürzen ohne klare Fehlermeldung.",
+                "Mindestens 25–30 GB auf C: freihalten.") { Category = "System" };
+
+        var elsewhere = pageFile.Drives().Where(d => d != "C:").ToList();
+        string pageNote = pageFile.Disabled ? "Die Auslagerungsdatei ist deaktiviert."
+            : pageFile.Drives().Contains("C:") ? "Die Auslagerungsdatei auf C: hat eine feste Größe und ist davon nicht betroffen."
+            : $"Die Auslagerungsdatei liegt auf {string.Join(", ", elsewhere)} und ist davon nicht betroffen.";
+        return new Finding(freeBytes < 5 * Gb ? Severity.Warning : Severity.Hint, title,
+            "Der Shader-Cache des Grafiktreibers und temporäre Dateien liegen auf C:. Ist der Platz knapp, können neue Shader nicht gespeichert werden – " +
+            "das führt zu Nachladerucklern, und Windows-Updates oder Absturzberichte können scheitern. " + pageNote,
+            "Mindestens 15–20 GB auf C: freihalten.") { Category = "System" };
     }
 }

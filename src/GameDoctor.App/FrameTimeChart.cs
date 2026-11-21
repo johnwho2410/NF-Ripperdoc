@@ -27,16 +27,32 @@ public sealed class FrameTimeChart : FrameworkElement
         set => SetValue(StuttersProperty, value);
     }
 
-    private static readonly Brush LineBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x00, 0xE0, 0xF0)));
-    private static readonly Brush GridBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x2A, 0x2F, 0x3E)));
-    private static readonly Brush LabelBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x8A, 0x93, 0xA6)));
     private static readonly Brush StutterBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xFF, 0x4D, 0x5E)));
-    private static readonly Typeface Font = new("Segoe UI");
+
+    // Linie, Raster, Beschriftung und Schrift kommen aus dem aktiven Skin.
+    private Brush LineBrush = Brushes.Cyan, GridBrush = Brushes.DimGray, LabelBrush = Brushes.Gray;
+    private Typeface Font = new("Segoe UI");
 
     private static Brush Frozen(Brush b) { b.Freeze(); return b; }
 
+    public FrameTimeChart()
+    {
+        // Selbst gezeichnet → bei Skin-Wechsel neu zeichnen. Abmelden beim Entladen, damit nichts hängen bleibt.
+        Loaded += (_, _) => ThemeManager.Changed += InvalidateVisual;
+        Unloaded += (_, _) => ThemeManager.Changed -= InvalidateVisual;
+    }
+
+    private void LoadSkin()
+    {
+        LineBrush = TryFindResource("ChartLine") as Brush ?? LineBrush;
+        GridBrush = TryFindResource("Line") as Brush ?? GridBrush;
+        LabelBrush = TryFindResource("MutedBrush") as Brush ?? LabelBrush;
+        if (TryFindResource("BodyFont") is FontFamily ff) Font = new Typeface(ff, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
+        LoadSkin();
         double w = ActualWidth, h = ActualHeight;
         const double left = 44, bottom = 22, top = 8, right = 8;
         double pw = w - left - right, ph = h - top - bottom;

@@ -84,6 +84,26 @@ public sealed class PerformanceViewModel : ObservableObject
     public bool PresentMonAvailable { get => _presentMonAvailable; set { if (Set(ref _presentMonAvailable, value)) Raise(nameof(PresentMonMissing)); } }
     public bool PresentMonMissing => !_presentMonAvailable;
     public bool HasReport { get => _hasReport; set => Set(ref _hasReport, value); }
+
+    // Ingame-Overlay
+    private bool _overlayVisible;
+    private OverlayCorner _overlayCorner;
+    public bool OverlayVisible { get => _overlayVisible; set { if (Set(ref _overlayVisible, value)) Raise(nameof(OverlayButtonText)); } }
+    public string OverlayButtonText => OverlayVisible ? "Overlay ausblenden" : "Overlay einblenden";
+    public string OverlayHint => $"Liegt über dem Spiel (randloses Fenster nötig) und meldet Probleme live. Ein/aus im Spiel: {OverlayController.HotkeyText}";
+    public OverlayCorner OverlayCorner
+    {
+        get => _overlayCorner;
+        set
+        {
+            if (!Set(ref _overlayCorner, value)) return;
+            Raise(nameof(CornerTopLeft)); Raise(nameof(CornerTopRight)); Raise(nameof(CornerBottomLeft)); Raise(nameof(CornerBottomRight));
+        }
+    }
+    public bool CornerTopLeft => OverlayCorner == OverlayCorner.TopLeft;
+    public bool CornerTopRight => OverlayCorner == OverlayCorner.TopRight;
+    public bool CornerBottomLeft => OverlayCorner == OverlayCorner.BottomLeft;
+    public bool CornerBottomRight => OverlayCorner == OverlayCorner.BottomRight;
     public string Hint { get => _hint; set => Set(ref _hint, value); }
     public string SettingsSummary { get => _settingsSummary; set => Set(ref _settingsSummary, value); }
     public IReadOnlyList<(double Sec, double Ms)>? Series { get => _series; set => Set(ref _series, value); }
