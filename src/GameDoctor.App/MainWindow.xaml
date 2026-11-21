@@ -285,6 +285,8 @@
                                         <StackPanel Grid.Column="1" Margin="16,12,16,14">
                                             <DockPanel>
                                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                                    <Button Content="Erneut prüfen" Click="FixRecheck_Click" Margin="0,0,6,0" Padding="10,4"
+                                                            ToolTip="Nachdem du die Mod deaktiviert hast: prüfen, ob sie wirklich aus dem Spiel verschwunden ist"/>
                                                     <Button Content="Hat geholfen" Tag="{Binding Id}" Click="FixHelped_Click" Margin="0,0,6,0" Padding="10,4"/>
                                                     <Button Content="Hat nicht geholfen" Tag="{Binding Id}" Click="FixNotHelped_Click" Margin="0,0,6,0" Padding="10,4"/>
                                                     <Button Content="Entfernen" Tag="{Binding Id}" Click="FixRemove_Click" Padding="10,4"/>
@@ -296,6 +298,21 @@
                                             </DockPanel>
                                             <TextBlock Text="{Binding Headline}" Foreground="{Binding StatusBrush}" FontWeight="SemiBold" Margin="0,10,0,0"/>
                                             <TextBlock Text="{Binding Detail}" Foreground="#C9CEDA" TextWrapping="Wrap" LineHeight="20" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding ConfirmText}" Foreground="#4ADE80" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0"
+                                                       Visibility="{Binding ConfirmText, Converter={StaticResource NullToCollapsed}}"/>
+                                            <Border Background="#2A2410" BorderBrush="{DynamicResource Accent}" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,10,0,0"
+                                                    Visibility="{Binding Instructions, Converter={StaticResource NullToCollapsed}}">
+                                                <StackPanel>
+                                                    <TextBlock Text="So deaktivierst du die Mod" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" Margin="0,0,0,4"/>
+                                                    <ItemsControl ItemsSource="{Binding Instructions}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="#E6E8EE" Margin="0,2"/>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
                                             <ProgressBar Value="{Binding Progress, Mode=OneWay}" Maximum="100" Height="6" Margin="0,10,0,0"
                                                          Foreground="{DynamicResource Accent}" Background="{DynamicResource PanelHi}" BorderThickness="0"
                                                          Visibility="{Binding ShowProgress, Converter={StaticResource BoolToVis}}"/>

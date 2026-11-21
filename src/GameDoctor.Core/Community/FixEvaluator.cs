@@ -30,6 +30,9 @@ public sealed record FixEvaluation(
     /// </summary>
     public bool LocationBound { get; init; }
 
+    /// <summary>Bei „Mod deaktivieren“: Die Dateien der Mod sind nachweislich nicht mehr im Spiel – der Test läuft.</summary>
+    public bool ModConfirmedDisabled { get; init; }
+
     /// <summary>Ergebnis, das (anonym) geteilt werden darf: nur bei belastbarer Aussage.</summary>
     public string? ShareableOutcome(FixAttempt a) => Status switch
     {
@@ -70,20 +73,29 @@ public sealed class FixEvaluator
 
     public FixEvaluation Evaluate(FixAttempt a)
     {
+        var result = EvaluateCore(a, out bool confirmedDisabled);
+        return confirmedDisabled ? result with { ModConfirmedDisabled = true } : result;
+    }
+
+    private FixEvaluation EvaluateCore(FixAttempt a, out bool confirmedDisabled)
+    {
         var now = DateTime.Now;
         var playSince = _ledger.PlayTime(a.StartedAt, now);
         var sigs = a.Signatures.ToHashSet(StringComparer.Ordinal);
+        confirmedDisabled = false;
 
-        // 1) Ist die Mod überhaupt deaktiviert?
+        // 1) Ist die Mod überhaupt deaktiviert? (GameDoctor ändert nichts – das macht der Spieler im Mod-Manager)
         if (a.Action == FixAction.DisableMod && _installedFiles is not null && a.TargetFiles.Count > 0)
         {
             var still = a.TargetFiles.Where(f => _installedFiles.Contains(f)).ToList();
             if (still.Count > 0)
                 return new FixEvaluation(FixStatus.ModStillInstalled,
-                    $"„{a.TargetLabel}“ ist noch installiert",
-                    $"Im Spielordner liegen noch Dateien dieser Mod ({string.Join(", ", still.Take(3))}{(still.Count > 3 ? " …" : "")}). " +
-                    "Solange sie aktiv ist, kann der Test nichts aussagen. In Vortex deaktivieren und „Bereitstellen“ (Deploy) nicht vergessen.",
+                    $"„{a.TargetLabel}“ ist noch aktiv – bitte selbst deaktivieren",
+                    $"Im Spiel sind noch Dateien dieser Mod vorhanden ({string.Join(", ", still.Take(3))}{(still.Count > 3 ? " …" : "")}). " +
+                    "GameDoctor ändert nichts an deinen Mods – deaktiviere sie wie unten beschrieben und klicke dann auf „Erneut prüfen“. " +
+                    "Bis dahin läuft der Test nicht.",
                     0, playSince, null, []);
+            confirmedDisabled = true;
         }
 
         // 2) Ist die Absturzstelle seitdem wieder aufgetreten?

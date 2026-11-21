@@ -24,6 +24,11 @@ public sealed class ModInventory
 {
     private readonly Dictionary<string, InstalledMod> _byFile = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, List<string>> _filesById = [];
+    // Name des Mod-Pakets im Mod-Manager je Datei – auch für Mods ohne Nexus-ID. Nur für lokale Anleitungen, nie geteilt.
+    private readonly Dictionary<string, string> _packageByFile = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Wie heißt das Mod-Paket dieser Datei im Mod-Manager? (nur lokale Anzeige)</summary>
+    public string? PackageNameForFile(string fileName) => _packageByFile.GetValueOrDefault(Path.GetFileName(fileName));
 
     public IReadOnlyList<InstalledMod> Mods { get; private set; } = [];
     public int PackagesWithoutId { get; private set; }
@@ -101,10 +106,19 @@ public sealed class ModInventory
             if (rel is null || source is null) continue;
             if (!bySource.TryGetValue(source, out var mod))
                 bySource[source] = mod = ParseVortexSource(source);
+            _packageByFile[Path.GetFileName(rel)] = VortexDisplayName(source);
             if (mod is not null) AddFile(Path.GetFileName(rel), mod);
         }
         Mods = bySource.Values.OfType<InstalledMod>().GroupBy(m => m.NexusId).Select(g => g.First()).OrderBy(m => m.NexusId).ToList();
         PackagesWithoutId = bySource.Values.Count(m => m is null);
+    }
+
+    /// <summary>Lesbarer Name aus dem Vortex-Staging-Ordner (ohne Nexus-ID, Version und Zeitstempel).</summary>
+    private static string VortexDisplayName(string source)
+    {
+        var m = VortexStyle.Match(source);
+        if (!m.Success) m = NexusStyle.Match(source);
+        return (m.Success ? m.Groups["name"].Value : source).Replace('_', ' ').Trim();
     }
 
     private static InstalledMod? ParseVortexSource(string source)
@@ -204,6 +218,13 @@ public sealed class ModInventory
             var modDir = Path.Combine(inst.ModsDir, name);
             if (!Directory.Exists(modDir)) continue;
             roots.Add(modDir);
+
+            try
+            {
+                foreach (var f in Directory.EnumerateFiles(modDir, "*", SearchOption.AllDirectories))
+                    _packageByFile[Path.GetFileName(f)] = name;
+            }
+            catch { /* kein Zugriff */ }
 
             var mod = ReadMo2Meta(modDir, name);
             if (mod is null) { withoutId++; continue; }

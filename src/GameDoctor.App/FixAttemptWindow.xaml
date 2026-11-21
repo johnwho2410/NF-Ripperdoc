@@ -14,10 +14,17 @@
         </Style>
     </Window.Resources>
 
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="24,20,24,20">
         <TextBlock Text="Lösung ausprobieren" Style="{StaticResource H1}"/>
         <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0"
-                   Text="Wähle, was du änderst. GameDoctor beobachtet danach automatisch, ob diese Absturzstelle wiederkommt – und sagt dir, ab wann das Ergebnis belastbar ist."/>
+                   Text="Wähle, was du ausprobieren möchtest. GameDoctor beobachtet danach automatisch, ob diese Absturzstelle wiederkommt – und sagt dir, ab wann das Ergebnis belastbar ist."/>
+        <Border Background="#2A2410" BorderBrush="{DynamicResource Accent}" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,12,0,0">
+            <TextBlock TextWrapping="Wrap">
+                <Run Text="Wichtig: " FontWeight="SemiBold" Foreground="{DynamicResource Accent}"/>
+                <Run Text="GameDoctor ändert nichts an deinen Mods. Die Änderung machst du selbst – z. B. in Vortex oder Mod Organizer 2. Die Anleitung unten zeigt dir, wie."/>
+            </TextBlock>
+        </Border>
         <TextBlock x:Name="TargetText" Margin="0,12,0,0" Foreground="{DynamicResource Cyan}" TextWrapping="Wrap"/>
 
         <Border Background="{DynamicResource Panel}" CornerRadius="8" Padding="18,14" Margin="0,14,0,0">
@@ -27,20 +34,34 @@
                 <TextBlock x:Name="NoSuggestions" Style="{StaticResource Muted}" Text="Für diesen Absturz gibt es keine konkreten Mod-Verdächtigen." Visibility="Collapsed" Margin="0,0,0,10"/>
 
                 <TextBlock Text="Oder selbst auswählen" FontWeight="SemiBold" Margin="0,8,0,10"/>
-                <RadioButton x:Name="RbOtherMod" GroupName="fix">
+                <RadioButton x:Name="RbOtherMod" GroupName="fix" Checked="Selection_Changed">
                     <StackPanel>
                         <TextBlock Text="Eine andere Mod:"/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <ComboBox x:Name="ActionCombo" Width="140" Margin="0,0,8,0" SelectedIndex="0">
+                            <ComboBox x:Name="ActionCombo" Width="140" Margin="0,0,8,0" SelectedIndex="0" SelectionChanged="Selection_Changed">
                                 <ComboBoxItem Content="deaktiviert"/>
                                 <ComboBoxItem Content="aktualisiert"/>
                             </ComboBox>
                             <ComboBox x:Name="ModCombo" Width="420" IsEditable="True" IsTextSearchEnabled="True"
-                                      DisplayMemberPath="DisplayName" GotFocus="ModCombo_GotFocus"/>
+                                      DisplayMemberPath="DisplayName" GotFocus="ModCombo_GotFocus" SelectionChanged="Selection_Changed"/>
                         </StackPanel>
                     </StackPanel>
                 </RadioButton>
-                <RadioButton x:Name="RbSetting" GroupName="fix" Content="Eine Einstellung geändert / etwas anderes (z. B. Treiber, Auslagerungsdatei)"/>
+                <RadioButton x:Name="RbSetting" GroupName="fix" Checked="Selection_Changed" Content="Eine Einstellung geändert / etwas anderes (z. B. Treiber, Auslagerungsdatei)"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Anleitung passend zur Auswahl und zum erkannten Mod-Manager -->
+        <Border Background="{DynamicResource Panel}" CornerRadius="8" Padding="18,14" Margin="0,12,0,0">
+            <StackPanel>
+                <TextBlock x:Name="InstructionsTitle" Text="So geht's" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <ItemsControl x:Name="InstructionsList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="#C9CEDA" Margin="0,2"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
         </Border>
 
@@ -53,9 +74,11 @@
         <DockPanel Margin="0,18,0,0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                 <Button Content="Abbrechen" Margin="0,0,8,0" IsCancel="True"/>
-                <Button Content="Test starten" Style="{StaticResource PrimaryButton}" Click="Start_Click" IsDefault="True"/>
+                <Button Content="Beobachtung starten" Style="{StaticResource PrimaryButton}" Click="Start_Click" IsDefault="True"
+                        ToolTip="GameDoctor merkt sich den Versuch und prüft ab jetzt, ob die Absturzstelle wiederkommt"/>
             </StackPanel>
             <TextBlock x:Name="ErrorText" Foreground="#FF4D5E" VerticalAlignment="Center" TextWrapping="Wrap"/>
         </DockPanel>
     </StackPanel>
+    </ScrollViewer>
 </Window>

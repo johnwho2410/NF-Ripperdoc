@@ -160,10 +160,19 @@ public sealed class DataSourceViewModel(GameDoctor.Core.Platform.DataSource d)
 /// <summary>Ein Lösungsversuch samt automatischer Bewertung – für den Tab „Lösungen“.</summary>
 public sealed class FixAttemptViewModel
 {
-    public FixAttemptViewModel(GameDoctor.Core.Community.FixAttempt a, GameDoctor.Core.Community.FixEvaluation ev)
+    public FixAttemptViewModel(GameDoctor.Core.Community.FixAttempt a, GameDoctor.Core.Community.FixEvaluation ev,
+        GameDoctor.Core.Community.ModInventory? inventory = null, GameDoctor.Core.Games.Cyberpunk.CyberpunkInstall? install = null)
     {
         Attempt = a;
         Evaluation = ev;
+
+        // Solange die Mod noch aktiv ist: Anleitung direkt in der Karte anzeigen
+        if (ev.Status == GameDoctor.Core.Community.FixStatus.ModStillInstalled && inventory is not null)
+            Instructions = FixAttemptWindow.Numbered(GameDoctor.Core.Community.FixInstructions.For(
+                a.Action, a.TargetLabel, a.NexusModId, a.TargetFiles, inventory, install));
+        ConfirmText = ev.ModConfirmedDisabled && ev.Status == GameDoctor.Core.Community.FixStatus.Waiting
+            ? "✔ Mod ist deaktiviert – du kannst ganz normal spielen. GameDoctor wertet bei jeder Analyse aus."
+            : null;
         var verb = a.Action switch
         {
             GameDoctor.Core.Community.FixAction.DisableMod => "deaktiviert",
@@ -216,6 +225,8 @@ public sealed class FixAttemptViewModel
     public string? VerdictText { get; }
     public string? Note { get; }
     public string ShareText { get; }
+    public IReadOnlyList<string>? Instructions { get; }
+    public string? ConfirmText { get; }
 }
 
 public sealed class MainViewModel : ObservableObject

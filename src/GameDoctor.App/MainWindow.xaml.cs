@@ -181,18 +181,27 @@ public partial class MainWindow : Window
     private ModInventory _inventory = new();
 
     /// <summary>Sitzungsprotokoll fortschreiben und alle Lösungsversuche neu bewerten.</summary>
-    private async Task RefreshFixesAsync(AnalysisResult result)
+    /// <param name="redetectMods">Mod-Liste frisch einlesen – nötig, nachdem der Spieler in Vortex/MO2 etwas geändert hat.</param>
+    private async Task RefreshFixesAsync(AnalysisResult result, bool redetectMods = false)
     {
         var vms = await Task.Run(() =>
         {
-            _inventory = result.Inventory;
+            _inventory = redetectMods && result.Install is not null ? ModInventory.Detect(result.Install) : result.Inventory;
             var ledger = PlaySessionLedger.Load();
             ledger.Harvest(result.Install, result.Crashes);
             try { ledger.Save(); } catch { /* nicht kritisch */ }
-            var evaluator = new FixEvaluator(result.Crashes, ledger, result.Install, result.Inventory.ExtraRoots);
-            return FixAttemptStore.Load().Select(a => new FixAttemptViewModel(a, evaluator.Evaluate(a))).ToList();
+            var evaluator = new FixEvaluator(result.Crashes, ledger, result.Install, _inventory.ExtraRoots);
+            return FixAttemptStore.Load().Select(a => new FixAttemptViewModel(a, evaluator.Evaluate(a), _inventory, result.Install)).ToList();
         });
         _vm.SetFixes(vms);
+    }
+
+    private async void FixRecheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm.Result is not { } result) return;
+        _vm.Status = "Prüfe Lösungsversuche …";
+        await RefreshFixesAsync(result, redetectMods: true);
+        _vm.Status = $"Lösungsversuche geprüft ({DateTime.Now:HH:mm} Uhr).";
     }
 
     private async void NewFix_Click(object sender, RoutedEventArgs e)
@@ -203,7 +212,9 @@ public partial class MainWindow : Window
         FixAttemptStore.Upsert(dlg.Created);
         await RefreshFixesAsync(result);
         Tabs.SelectedIndex = 4;
-        _vm.Status = $"Lösungsversuch gestartet: {dlg.Created.TargetLabel}. Spiel jetzt ganz normal weiter – GameDoctor wertet bei jeder Analyse aus.";
+        _vm.Status = dlg.Created.Action == FixAction.DisableMod
+            ? $"Beobachtung gestartet: {dlg.Created.TargetLabel}. Jetzt die Mod selbst deaktivieren und dann „Erneut prüfen“ klicken."
+            : $"Beobachtung gestartet: {dlg.Created.TargetLabel}. Spiel jetzt ganz normal weiter – GameDoctor wertet bei jeder Analyse aus.";
     }
 
     private async void FixHelped_Click(object sender, RoutedEventArgs e) => await SetVerdict(sender, UserVerdict.Helped);
