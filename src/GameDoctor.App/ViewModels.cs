@@ -68,6 +68,12 @@ public sealed class CrashViewModel
     public string Folder => Case.Report.Folder;
 }
 
+/// <summary>Zeile der Mod-Tabelle (Mods &amp; System). „Verdächtig“ nur, wenn die Mod in Absturz-Stacks vorkam.</summary>
+public sealed record ModRow(string Name, string Version, string NexusId, string Status, bool Suspect);
+
+/// <summary>Zeile der Liste „Top-Problemsignaturen“ in der Übersicht.</summary>
+public sealed record SignatureRow(int Rank, string Signature, string CountText);
+
 /// <summary>Zustand des Performance-Tabs.</summary>
 public sealed class PerformanceViewModel : ObservableObject
 {
@@ -293,6 +299,10 @@ public sealed class MainViewModel : ObservableObject
     public CrashViewModel? SelectedCrash { get => _selectedCrash; set => Set(ref _selectedCrash, value); }
 
     public ObservableCollection<StatTile> Stats { get; } = [];
+    public ObservableCollection<SignatureRow> TopSignatures { get; } = [];
+    public ObservableCollection<ModRow> Mods { get; } = [];
+    private bool _hasMods;
+    public bool HasMods { get => _hasMods; set => Set(ref _hasMods, value); }
     public ObservableCollection<Finding> TopFindings { get; } = [];
     public ObservableCollection<Finding> PatternFindings { get; } = [];
     public ObservableCollection<Finding> EnvironmentFindings { get; } = [];
@@ -331,6 +341,31 @@ public sealed class MainViewModel : ObservableObject
         Stats.Add(topMod is not null
             ? new StatTile($"{topMod.Count()}×", L.T("verdächtigste Mod"), topMod.Key)
             : new StatTile("–", L.T("verdächtigste Mod"), L.T("keine Mod auffällig")));
+
+        Mods.Clear();
+        if (r.ModLogs is { } logs)
+        {
+            if (logs.Red4ExtVersion is { } rv) Mods.Add(new ModRow("RED4ext", rv, "", L.T("Framework"), false));
+            if (logs.CetVersion is { } cv) Mods.Add(new ModRow("Cyber Engine Tweaks", cv, "", L.T("Framework"), false));
+        }
+        static string Norm(string s) => new(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+        var suspects = crashes
+            .SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay).Select(s => s.Name).Distinct())
+            .GroupBy(n => n).Select(g => (Key: Norm(g.Key), N: g.Count())).ToList();
+        foreach (var m in r.Inventory.Mods.OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase))
+        {
+            var key = Norm(m.DisplayName);
+            var hit = key.Length >= 4 ? suspects.Where(s => s.Key.Contains(key) || key.Contains(s.Key)).Sum(s => s.N) : 0;
+            Mods.Add(new ModRow(m.DisplayName, m.Version ?? "–", $"#{m.NexusId}",
+                hit > 0 ? L.F("Verdächtig · {0}× in Abstürzen", hit) : L.T("Installiert"), hit > 0));
+        }
+        HasMods = Mods.Count > 0;
+
+        TopSignatures.Clear();
+        int rank = 0;
+        foreach (var g in crashes.Where(c => c.Signature != "?").GroupBy(c => c.Signature)
+                     .Select(g => (Sig: g.Key, N: g.Count())).Where(x => x.N > 1).OrderByDescending(x => x.N).Take(5))
+            TopSignatures.Add(new SignatureRow(++rank, g.Sig, $"{g.N}×"));
 
         TopFindings.Clear();
         foreach (var f in crashes.Take(1).SelectMany(c => c.Findings)

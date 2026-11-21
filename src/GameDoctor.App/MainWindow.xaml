@@ -96,8 +96,35 @@
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>
 
-                    <TextBlock Text="{local:T 'Das Wichtigste'}" Style="{StaticResource H2}" Margin="0,26,0,10"/>
-                    <ItemsControl ItemsSource="{Binding TopFindings}" ItemTemplate="{StaticResource FindingTemplate}"/>
+                    <Grid Margin="0,26,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{local:T 'Das Wichtigste'}" Style="{StaticResource H2}" Margin="0,0,0,10"/>
+                            <ItemsControl ItemsSource="{Binding TopFindings}" ItemTemplate="{StaticResource FindingTemplate}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Width="340" Margin="16,0,0,0" VerticalAlignment="Top">
+                            <TextBlock Text="{local:T 'Top-Problemsignaturen'}" Style="{StaticResource H2}" Margin="0,0,0,10"/>
+                            <local:ShapeBorder Style="{StaticResource Card}" Padding="14,10">
+                                <ItemsControl ItemsSource="{Binding TopSignatures}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,5">
+                                                <Border DockPanel.Dock="Left" Background="{DynamicResource Accent}" Width="22" Height="22" Margin="0,0,10,0">
+                                                    <TextBlock Text="{Binding Rank}" Foreground="{DynamicResource OnAccent}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding CountText}" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding Signature}" FontFamily="{DynamicResource MonoFont}" FontSize="12.5" VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Signature}"/>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </local:ShapeBorder>
+                        </StackPanel>
+                    </Grid>
 
                     <TextBlock Text="{local:T 'Muster über alle Abstürze'}" Style="{StaticResource H2}"/>
                     <ItemsControl ItemsSource="{Binding PatternFindings}" ItemTemplate="{StaticResource FindingTemplate}"/>
@@ -397,6 +424,55 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </Border>
+
+                    <TextBlock Text="{local:T 'Installierte Mods'}" Style="{StaticResource H2}" Margin="0,22,0,10"/>
+                    <local:ShapeBorder Style="{StaticResource Card}" Padding="0,0,0,6"
+                                       Visibility="{Binding HasMods, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <Grid Margin="16,10,16,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="230"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{local:T 'MOD'}" Foreground="{DynamicResource MutedBrush}" FontSize="12" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="1" Text="{local:T 'VERSION'}" Foreground="{DynamicResource MutedBrush}" FontSize="12" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="2" Text="NEXUS-ID" Foreground="{DynamicResource MutedBrush}" FontSize="12" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="3" Text="STATUS" Foreground="{DynamicResource MutedBrush}" FontSize="12" FontWeight="SemiBold"/>
+                            </Grid>
+                            <Border Height="1" Background="{DynamicResource Line}"/>
+                            <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Mods}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="row" Padding="16,6" Background="Transparent">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="130"/>
+                                                        <ColumnDefinition Width="90"/>
+                                                        <ColumnDefinition Width="230"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" Margin="0,0,12,0"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Version}" FontFamily="{DynamicResource MonoFont}" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding NexusId}" FontFamily="{DynamicResource MonoFont}" FontSize="12.5" Foreground="{DynamicResource MutedBrush}"/>
+                                                    <TextBlock x:Name="st" Grid.Column="3" Text="{Binding Status}" Foreground="{DynamicResource MutedBrush}"/>
+                                                </Grid>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding Suspect}" Value="True">
+                                                    <Setter TargetName="st" Property="Foreground" Value="#FFB000"/>
+                                                    <Setter TargetName="st" Property="FontWeight" Value="SemiBold"/>
+                                                    <Setter TargetName="row" Property="Background" Value="{DynamicResource PanelHi}"/>
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </local:ShapeBorder>
 
                     <TextBlock Text="{local:T 'Mod-Umgebung, Hintergrundfehler und System'}" Style="{StaticResource H2}" Margin="0,22,0,10"/>
                     <ItemsControl ItemsSource="{Binding EnvironmentFindings}" ItemTemplate="{StaticResource FindingTemplate}"/>
