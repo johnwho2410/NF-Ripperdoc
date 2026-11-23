@@ -1,4 +1,4 @@
-NF-RIPPERDOC (GameDoctor) 0.1.0 – Cyberpunk 2077 Mod-Diagnose
+NF-RIPPERDOC (GameDoctor) 0.2.0 – Cyberpunk 2077 Mod-Diagnose
 =============================================================
 
 DEUTSCH
