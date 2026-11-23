@@ -25,7 +25,18 @@ public abstract class ObservableObject : INotifyPropertyChanged
 
 public sealed record StatTile(string Value, string Label, string? Sub = null);
 
-public sealed record DetailRow(string Key, string Value);
+/// <summary>Ein Eintrag der Karte „Dein nächster Schritt“.</summary>
+public sealed class NextStepViewModel(int number, NextStep step)
+{
+    public int Number { get; } = number;
+    public NextStep Step { get; } = step;
+    public string Headline => Step.Headline;
+    public string Reason => Step.Reason;
+    public string? ButtonText => Step.ButtonText;
+    public bool HasButton => Step.ButtonText is not null && Step.Action != NextStepAction.None;
+}
+
+public sealed record DetailRow(string Key, string Value, bool Technical = false);
 
 public sealed class CrashViewModel
 {
@@ -44,8 +55,8 @@ public sealed class CrashViewModel
 
         var rows = new List<DetailRow>
         {
-            new(L.T("Absturzstelle"), c.Signature),
-            new(L.T("Fehler"), r.Expression ?? r.ErrorReason ?? "?"),
+            new(L.T("Absturzstelle"), c.Signature, true),
+            new(L.T("Fehler"), r.Expression ?? r.ErrorReason ?? "?", true),
             new(L.T("Laufzeit bis Absturz"), Uptime),
             new(L.T("Ladezustand"), r.LoadingStage ?? "?"),
             new("VRAM", r.VramUsedMb is int used && r.VramTotalMb is int total ? $"{used:N0} / {total:N0} MB ({100.0 * used / total:F0} %)" : "?"),
@@ -58,20 +69,20 @@ public sealed class CrashViewModel
         if (c.Symbols is { } sym)
         {
             if (sym.Site is not null)
-                rows.Add(new(L.T("Funktion"), GameDoctor.Core.Symbols.SymbolFormat.Short(sym.Site, 90)));
+                rows.Add(new(L.T("Funktion"), GameDoctor.Core.Symbols.SymbolFormat.Short(sym.Site, 90), true));
             if (sym.Subsystem is not null)
-                rows.Add(new(L.T("Teilsystem"), sym.SubsystemFunction is null ? sym.Subsystem.Label : $"{sym.Subsystem.Label}  ·  {sym.SubsystemFunction}"));
+                rows.Add(new(L.T("Teilsystem"), sym.SubsystemFunction is null ? sym.Subsystem.Label : $"{sym.Subsystem.Label}  ·  {sym.SubsystemFunction}", true));
         }
 
         // Aus dem Speicherabbild abgeleitete Hinweise (Zeiger-Register, Objekt-Klassen als Kennzeichen)
         if (c.Dump is { Error: null } d)
         {
             if (d.BaseRegister is not null && d.AddressClass != FaultAddressClass.Unknown)
-                rows.Add(new(L.T("Zeiger-Register"), $"{d.BaseRegister} = 0x{d.BaseRegisterValue:X}"));
+                rows.Add(new(L.T("Zeiger-Register"), $"{d.BaseRegister} = 0x{d.BaseRegisterValue:X}", true));
             if (d.RegisterObjects.Count > 0)
-                rows.Add(new(L.T("Objekte in Registern"), string.Join("  ·  ", d.RegisterObjects.Take(4).Select(o => $"{o.Register}: +0x{o.ClassOffset:X}"))));
+                rows.Add(new(L.T("Objekte in Registern"), string.Join("  ·  ", d.RegisterObjects.Take(4).Select(o => $"{o.Register}: +0x{o.ClassOffset:X}")), true));
             if (d.ObjectClasses.Count > 0)
-                rows.Add(new(L.T("Objekt-Klassen auf dem Stack"), string.Join("  ·  ", d.ObjectClasses.Take(4).Select(o => $"+0x{o.ClassOffset:X} ×{o.Count}"))));
+                rows.Add(new(L.T("Objekt-Klassen auf dem Stack"), string.Join("  ·  ", d.ObjectClasses.Take(4).Select(o => $"+0x{o.ClassOffset:X} ×{o.Count}")), true));
         }
         Details = rows;
     }
@@ -296,6 +307,22 @@ public sealed class MainViewModel : ObservableObject
         Fixes.Clear();
         foreach (var f in fixes) Fixes.Add(f);
         HasFixes = Fixes.Count > 0;
+    }
+
+    // ---- „Dein nächster Schritt“ (Übersicht)
+    public ObservableCollection<NextStepViewModel> NextSteps { get; } = [];
+    private string _nextStepsSummary = "";
+    public string NextStepsSummary { get => _nextStepsSummary; set => Set(ref _nextStepsSummary, value); }
+
+    public void SetNextSteps(IEnumerable<NextStep> steps)
+    {
+        NextSteps.Clear();
+        int n = 0;
+        foreach (var s in steps) NextSteps.Add(new NextStepViewModel(++n, s));
+        int crashes = Result?.Crashes.Count ?? 0;
+        NextStepsSummary = crashes == 0
+            ? L.F("Letzte {0} Tage: keine Abstürze", Days)
+            : L.F("Letzte {0} Tage: {1} Abstürze", Days, crashes);
     }
 
     public PerformanceViewModel Perf { get; } = new();

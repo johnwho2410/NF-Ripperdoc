@@ -1,0 +1,128 @@
+<Window x:Class="GameDoctor.App.BisectWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:GameDoctor.App"
+        Title="{local:T 'Welche Mod ist es?'}"
+        Width="780" Height="760" MinWidth="620" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        Icon="Assets/app.ico"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
+        FontFamily="{DynamicResource BodyFont}" FontSize="13">
+    <Grid Margin="28,22,28,22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="{local:T 'Welche Mod ist es?'}" Style="{StaticResource H1}"/>
+            <TextBlock x:Name="IntroText" Style="{StaticResource Muted}" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+            <StackPanel>
+
+                <!-- Vorbereitung -->
+                <StackPanel x:Name="SetupPanel">
+                    <local:ShapeBorder Style="{StaticResource Card}" Padding="18,14">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Body}" TextWrapping="Wrap"
+                                       Text="{local:T 'So funktioniert es: Du schaltest in jeder Runde die Hälfte der verdächtigen Mods aus und spielst wie gewohnt. Stürzt das Spiel dann nicht mehr ab, steckt die Ursache in dieser Hälfte – sonst in der anderen. So wird die Auswahl Runde für Runde kleiner, bis eine einzelne Mod übrig ist.'}"/>
+                            <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0"
+                                       Text="{local:T 'GameDoctor ändert dabei nichts an deinen Mods: Du schaltest sie selbst im Mod-Manager um, GameDoctor führt dich durch die Schritte und merkt sich den Stand.'}"/>
+                        </StackPanel>
+                    </local:ShapeBorder>
+
+                    <TextBlock Text="{local:T 'Welche Mods sollen getestet werden?'}" Style="{StaticResource H2}"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,0,0,8"
+                               Text="{local:T 'Frameworks und Bibliotheken (z. B. RED4ext, Codeware, ArchiveXL) fehlen absichtlich: Andere Mods brauchen sie, und ein Ausschalten würde das Ergebnis verfälschen. Nimm Mods heraus, die du auf keinen Fall ausschalten willst.'}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Content="{local:T 'Alle'}" Click="SelectAll_Click" Margin="0,0,8,0"/>
+                        <Button x:Name="SelectFlaggedButton" Content="{local:T 'Nur aufgefallene Mods'}" Click="SelectFlagged_Click" Margin="0,0,8,0"
+                                ToolTip="{local:T 'Mods, die in den Abstürzen aufgetaucht sind'}"/>
+                        <Button Content="{local:T 'Keine'}" Click="SelectNone_Click"/>
+                    </StackPanel>
+                    <local:ShapeBorder Style="{StaticResource Card}" Padding="14,8">
+                        <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="CandidateList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Content="{Binding Display}" Margin="0,3"
+                                                  Checked="Candidate_Changed" Unchecked="Candidate_Changed"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </local:ShapeBorder>
+                    <TextBlock x:Name="EstimateText" Margin="0,10,0,0" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <!-- Laufende Runde -->
+                <StackPanel x:Name="RoundPanel" Visibility="Collapsed">
+                    <TextBlock x:Name="RoundTitle" Style="{StaticResource H2}" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="RoundSubtitle" Style="{StaticResource Muted}"/>
+
+                    <!-- Vor dem Start der Runde: Anleitung -->
+                    <StackPanel x:Name="InstructionsPanel" Margin="0,12,0,0">
+                        <local:ShapeBorder Style="{StaticResource Card}" Padding="18,14">
+                            <ItemsControl x:Name="InstructionsList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,3"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </local:ShapeBorder>
+                        <TextBlock x:Name="CheckText" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <!-- Nach dem Start: Beobachtung -->
+                    <StackPanel x:Name="WatchPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                        <local:ShapeBorder Style="{StaticResource Card}" Padding="18,14">
+                            <StackPanel>
+                                <TextBlock x:Name="WatchHeadline" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="WatchText" Style="{StaticResource Muted}" Margin="0,6,0,0"/>
+                                <ProgressBar x:Name="WatchProgress" Maximum="100" Height="6" Margin="0,12,0,0"
+                                             Foreground="{DynamicResource Accent}" Background="{DynamicResource PanelHi}" BorderThickness="0"/>
+                            </StackPanel>
+                        </local:ShapeBorder>
+                        <TextBlock Style="{StaticResource Muted}" Margin="0,10,0,0" FontSize="12" TextWrapping="Wrap"
+                                   Text="{local:T 'Jetzt ganz normal spielen. Danach hier „Aktualisieren“ klicken – GameDoctor liest die Abstürze neu ein und sagt dir, ob die Runde ausreicht.'}"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="HistoryTitle" Text="{local:T 'Bisherige Runden'}" Style="{StaticResource H2}"/>
+                    <ItemsControl x:Name="HistoryList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Style="{StaticResource Muted}" Margin="0,2" TextWrapping="Wrap"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- Ergebnis -->
+                <StackPanel x:Name="DonePanel" Visibility="Collapsed">
+                    <local:ShapeBorder Style="{StaticResource Card}" Padding="20,16">
+                        <StackPanel>
+                            <TextBlock x:Name="DoneHeadline" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="DoneText" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="{DynamicResource TextSoft}"/>
+                        </StackPanel>
+                    </local:ShapeBorder>
+                    <TextBlock x:Name="DoneNext" Margin="0,12,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <DockPanel Grid.Row="2" Margin="0,16,0,0">
+            <Button x:Name="CancelSearchButton" DockPanel.Dock="Left" Content="{local:T 'Suche abbrechen'}" Click="CancelSearch_Click" Visibility="Collapsed"/>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="SecondaryButton" Margin="0,0,8,0" Click="Secondary_Click" Visibility="Collapsed"/>
+                <Button x:Name="TertiaryButton" Margin="0,0,8,0" Click="Tertiary_Click" Visibility="Collapsed"/>
+                <Button x:Name="PrimaryActionButton" Style="{StaticResource PrimaryButton}" Click="Primary_Click" Padding="18,8"/>
+                <Button Content="{local:T 'Schließen'}" Click="Close_Click" Margin="8,0,0,0"/>
+            </StackPanel>
+            <Border/>
+        </DockPanel>
+    </Grid>
+</Window>

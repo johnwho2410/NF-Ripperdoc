@@ -17,6 +17,15 @@ public sealed record Finding(
     IReadOnlyList<string>? Evidence = null)
 {
     public string Category { get; init; } = "Allgemein";
+
+    /// <summary>Verständliche Überschrift ohne Fachbegriffe, wie ein Spieler sie sagen würde (null = <see cref="Title"/> verwenden).</summary>
+    public string? PlainTitle { get; init; }
+    /// <summary>Verständliche Erklärung in ein bis zwei Sätzen, ohne Adressen und Fachbegriffe (null = <see cref="Detail"/> verwenden).</summary>
+    public string? Plain { get; init; }
+    /// <summary>Nur für die Experten-Ansicht: Technik oder Statistik, aus der ein Spieler nichts machen kann.</summary>
+    public bool ExpertOnly { get; init; }
+    /// <summary>Absturzstelle, auf die sich der Befund bezieht (damit „Lösung ausprobieren“ den richtigen Absturz öffnen kann).</summary>
+    public string? Signature { get; init; }
 }
 
 /// <summary>Wohin ein geladenes Modul (DLL) gehört.</summary>

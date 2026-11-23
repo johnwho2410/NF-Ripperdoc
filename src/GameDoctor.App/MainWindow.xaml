@@ -88,6 +88,40 @@
                         </DockPanel>
                     </Border>
 
+                    <!-- Dein nächster Schritt: die wenigen Dinge, die jetzt helfen -->
+                    <local:ShapeBorder Style="{StaticResource Card}" Padding="20,16" Margin="0,0,0,18"
+                                       Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding NextStepsSummary}" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{local:T 'Dein nächster Schritt'}" Style="{StaticResource H2}" Margin="0"/>
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding NextSteps}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Background="{DynamicResource Accent}" Width="26" Height="26" Margin="0,1,14,0" VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding Number}" Foreground="{DynamicResource OnAccent}" FontWeight="Bold"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="{Binding Headline}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Reason}" Style="{StaticResource Muted}" Margin="0,3,0,0"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Content="{Binding ButtonText}" Click="NextStep_Click" VerticalAlignment="Top" Margin="16,0,0,0"
+                                                    Visibility="{Binding HasButton, Converter={StaticResource BoolToVis}}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </local:ShapeBorder>
+
                     <ItemsControl ItemsSource="{Binding Stats}" ItemTemplate="{StaticResource StatTileTemplate}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -188,6 +222,12 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Margin="0,4">
+                                            <Grid.Visibility>
+                                                <MultiBinding Converter="{StaticResource TechnicalVisibility}">
+                                                    <Binding Path="Technical"/>
+                                                    <Binding Path="Expert" Source="{x:Static local:ViewMode.Instance}"/>
+                                                </MultiBinding>
+                                            </Grid.Visibility>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="180"/>
                                                 <ColumnDefinition Width="*"/>
@@ -203,6 +243,7 @@
                         <TextBlock Text="{local:T 'Diagnose'}" Style="{StaticResource H2}"/>
                         <ItemsControl ItemsSource="{Binding Findings}" ItemTemplate="{StaticResource FindingTemplate}"/>
 
+                        <StackPanel Visibility="{Binding ExpertVisibility, Source={x:Static local:ViewMode.Instance}}">
                         <StackPanel Visibility="{Binding SuspectModules, Converter={StaticResource NullToCollapsed}}">
                             <TextBlock Text="{local:T 'Nicht-Vanilla-Module auf dem Stack'}" Style="{StaticResource H2}"/>
                             <local:ShapeBorder Style="{StaticResource Card}" Padding="18,12">
@@ -216,6 +257,7 @@
                             </local:ShapeBorder>
                             <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,8,0,0"
                                        Text="{local:T 'Rücksprungadressen auf dem Stack des abstürzenden Threads. Ein starkes Indiz für Beteiligung, aber kein Beweis.'}"/>
+                        </StackPanel>
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
@@ -319,6 +361,18 @@
                     <TextBlock Text="{local:T 'Lösungsversuche'}" Style="{StaticResource H2}" Margin="0,0,0,4"/>
                     <TextBlock Style="{StaticResource Muted}" Margin="0,0,0,14"
                                Text="{local:T 'Hast du eine Mod deaktiviert oder etwas geändert, prüft GameDoctor hier automatisch, ob die Absturzstelle wiederkommt. Neue Versuche startest du im Tab „Abstürze“ mit „Lösung ausprobieren …“.'}"/>
+
+                    <!-- Mod-Suche: wenn keine einzelne Mod auffällt -->
+                    <local:ShapeBorder Style="{StaticResource Card}" Padding="18,12" Margin="0,0,0,14">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="{local:T 'Mod-Suche öffnen …'}" Click="OpenBisect_Click" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            <StackPanel>
+                                <TextBlock Text="{local:T 'Welche Mod ist es?'}" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Style="{StaticResource Muted}" Margin="0,3,0,0"
+                                           Text="{local:T 'Kein klarer Verdächtiger? GameDoctor führt dich Schritt für Schritt zu der Mod, die die Abstürze auslöst.'}"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </local:ShapeBorder>
 
                     <local:ShapeBorder Style="{StaticResource Card}" Padding="18,14"
                             Visibility="{Binding NoFixes, Converter={StaticResource BoolToVis}}">
@@ -494,6 +548,9 @@
         <!-- ===== Statuszeile ===== -->
         <Border Grid.Row="2" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="28,6">
             <DockPanel>
+                <CheckBox DockPanel.Dock="Right" Content="{local:T 'Technische Details'}" FontSize="12" Margin="24,0,0,0" VerticalAlignment="Center"
+                          IsChecked="{Binding Expert, Source={x:Static local:ViewMode.Instance}, Mode=TwoWay}"
+                          ToolTip="{local:T 'Zeigt Adressen, Fehlercodes und Statistik – für Mod-Autoren und Neugierige'}"/>
                 <TextBlock DockPanel.Dock="Right" Text="{Binding GameInfo}" Style="{StaticResource Muted}" FontSize="12" Margin="24,0,0,0"
                            TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" MaxWidth="560" ToolTip="{Binding FrameworkInfo}"/>
                 <TextBlock Text="{Binding Status}" Style="{StaticResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>

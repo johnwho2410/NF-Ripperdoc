@@ -48,6 +48,62 @@ public sealed class SeverityLabelConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
+/// <summary>
+/// Wählt je nach Ansicht den verständlichen oder den technischen Text eines Befunds.
+/// Werte: [0] Finding, [1] Experten-Ansicht (bool). Parameter: „title“ oder „detail“.
+/// </summary>
+public sealed class FindingTextConverter : System.Windows.Data.IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length == 0 || values[0] is not Finding f) return "";
+        bool expert = values.Length > 1 && values[1] is true;
+        return (parameter as string) switch
+        {
+            "title" => expert ? f.Title : f.PlainTitle ?? f.Title,
+            "detail" => expert ? f.Detail : f.Plain ?? f.Detail,
+            _ => "",
+        };
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
+/// <summary>
+/// Blendet Teile eines Befunds je nach Ansicht aus. Werte: [0] Finding, [1] Experten-Ansicht.
+/// Parameter: „card“ (ganze Karte; nur für Experten, wenn <see cref="Finding.ExpertOnly"/>) oder „evidence“ (Einzelheiten; nur für Experten oder wenn es keinen verständlichen Text gibt).
+/// </summary>
+public sealed class FindingVisibilityConverter : System.Windows.Data.IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length == 0 || values[0] is not Finding f) return Visibility.Collapsed;
+        bool expert = values.Length > 1 && values[1] is true;
+        bool show = (parameter as string) switch
+        {
+            "card" => expert || !f.ExpertOnly,
+            "evidence" => f.Evidence is { Count: > 0 } && (expert || f.Plain is null),
+            _ => true,
+        };
+        return show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
+/// <summary>Technische Zeilen („Absturzstelle“, „Zeiger-Register“ …) nur in der Experten-Ansicht. Werte: [0] technisch (bool), [1] Experten-Ansicht.</summary>
+public sealed class TechnicalVisibilityConverter : System.Windows.Data.IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        bool technical = values.Length > 0 && values[0] is true;
+        bool expert = values.Length > 1 && values[1] is true;
+        return !technical || expert ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
 /// <summary>Anteil (0–1) als Stern-Breite für Grid-Spalten.</summary>
 public sealed class ShareToStarConverter : IValueConverter
 {

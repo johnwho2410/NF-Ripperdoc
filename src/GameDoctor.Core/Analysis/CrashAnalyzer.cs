@@ -156,7 +156,11 @@ public static class CrashAnalyzer
                 c.FaultKind == ModuleKind.ModFramework
                     ? L.T("Framework (RED4ext/CET/ArchiveXL …) auf die neueste Version für deine Spielversion aktualisieren. Prüfen, ob ein Spiel-Update kürzlich kam – Frameworks brauchen dann meist ein Update.")
                     : L.T("Diese Mod aktualisieren oder testweise deaktivieren. Prüfen, ob sie zur aktuellen Spielversion passt und ihre Abhängigkeiten (RED4ext, Codeware, ArchiveXL, TweakXL) aktuell sind."))
-            { Category = "Ursache" });
+            {
+                Category = "Ursache",
+                PlainTitle = L.F("Der Absturz passierte in der Mod „{0}“", c.FaultLabel),
+                Plain = L.F("Der Absturz geschah direkt im Programmcode von „{0}“ – sehr wahrscheinlich ist diese Mod die Ursache.", c.FaultLabel),
+            });
         }
         // R2: Grafiktreiber
         else if (c.FaultKind == ModuleKind.GpuDriver)
@@ -177,7 +181,11 @@ public static class CrashAnalyzer
                     L.F("Absturz im Grafiktreiber, ausgelöst durch {0}", tech),
                     L.F("Der Treiber ({0}) stürzte ab, während {1} ({2}) ihn aufrief. {3}", c.FaultLabel, tech, upscaler, exceptionText),
                     L.F("{0} testweise ausschalten bzw. auf ein anderes Upscaling umstellen. Wurde die DLSS-DLL manuell ersetzt (z. B. DLSS Swapper), die Originaldatei wiederherstellen. Grafiktreiber aktualisieren oder sauber neu installieren.", tech))
-                { Category = "Ursache" });
+                {
+                    Category = "Ursache",
+                    PlainTitle = L.F("Absturz durch die Grafiktechnik {0}", tech),
+                    Plain = L.F("Der Grafiktreiber ist abgestürzt, während {0} gearbeitet hat. Meist hilft es, {0} auszuschalten und den Grafiktreiber neu zu installieren.", tech),
+                });
                 goto afterFault;
             }
 
@@ -185,7 +193,11 @@ public static class CrashAnalyzer
                 L.F("Absturz im Grafiktreiber ({0})", c.FaultLabel),
                 L.F("Der Fehler trat im Grafiktreiber auf. {0} Häufige Ursachen: instabile GPU-Übertaktung/Undervolting, voller VRAM, fehlerhafte Treiberversion oder Overlays.", exceptionText),
                 L.T("Übertaktung/Undervolt der GPU testweise zurücksetzen, Treiber sauber neu installieren (oder eine Vorgängerversion testen), Raytracing/Pathtracing testweise ausschalten."))
-            { Category = "Ursache" });
+            {
+                Category = "Ursache",
+                PlainTitle = L.T("Absturz im Grafiktreiber"),
+                Plain = L.T("Der Grafiktreiber ist abgestürzt. Häufige Gründe: eine übertaktete Grafikkarte, voller Grafikspeicher oder ein fehlerhafter Treiber."),
+            });
         }
         // R3: Overlay
         else if (c.FaultKind == ModuleKind.Overlay)
@@ -196,7 +208,11 @@ public static class CrashAnalyzer
                 L.F("Absturz in einem Overlay ({0})", product),
                 L.F("Der Fehler trat in {0} auf – einem Programm, das sich ins Spiel einklinkt. {1}", faultPath, exceptionText),
                 L.F("{0} für Cyberpunk deaktivieren und erneut testen.", product))
-            { Category = "Ursache" });
+            {
+                Category = "Ursache",
+                PlainTitle = L.F("Absturz durch ein Zusatzprogramm ({0})", product),
+                Plain = L.F("„{0}“ klinkt sich ins Spiel ein und hat den Absturz ausgelöst. Schalte es für Cyberpunk testweise aus.", product),
+            });
         }
         // R4: Engine/Windows – Indizien vom Stack
         else if (d is not null && d.Error is null)
@@ -216,7 +232,12 @@ public static class CrashAnalyzer
                     L.F("{0} Auf dem Stack des abstürzenden Threads liegen Rücksprungadressen in diesen Mods/Hooks. Das ist ein starkes Indiz, dass sie beteiligt waren (aber kein Beweis):", exceptionText),
                     L.T("Die oben genannten Mods zuerst aktualisieren bzw. testweise deaktivieren."),
                     mods.Select(m => L.F("{0} ({1}, {2}× auf dem Stack)", m.Name, ModuleClassifier.KindLabel(m.Kind), m.Hits)).ToList())
-                { Category = "Ursache" });
+                {
+                    Category = "Ursache",
+                    PlainTitle = L.T("Beim Absturz waren Mods beteiligt"),
+                    Plain = L.F("Diese Mods waren beim Absturz aktiv beteiligt: {0}. Das ist ein Hinweis, kein Beweis.",
+                        string.Join(", ", mods.Take(5).Select(m => m.Name)) + (mods.Count > 5 ? " …" : "")),
+                });
             }
             else
             {
@@ -226,7 +247,11 @@ public static class CrashAnalyzer
                         ? L.F("{0} Auf dem Stack wurden keine Mods gefunden. Die Funktionsnamen (Community-Daten) stehen bei den technischen Daten; die Signatur {1} kann mit anderen Abstürzen verglichen werden.", exceptionText, c.Signature)
                         : L.F("{0} Auf dem Stack wurden keine Mods gefunden. Ohne Debug-Symbole von CD Projekt lässt sich die genaue Funktion nicht benennen – die Signatur {1} kann aber mit anderen Abstürzen verglichen werden.", exceptionText, c.Signature),
                     null)
-                { Category = "Ursache" });
+                {
+                    Category = "Ursache",
+                    PlainTitle = L.T("Dieser Absturz liegt im Spiel selbst"),
+                    Plain = L.T("Es wurde keine Mod als Auslöser gefunden. Solche Abstürze lassen sich oft nicht direkt beheben – Mods können sie aber manchmal begünstigen."),
+                });
             }
         }
         else if (d?.Error is { } err)
@@ -379,7 +404,7 @@ public static class CrashAnalyzer
         result.PatternFindings.Add(new Finding(Severity.Info, L.T("Abstürze nach Teilsystem"),
             L.F("Bei {0} von {1} Abstürzen ließ sich aus den Funktionsnamen im Aufrufpfad ein Teilsystem des Spiels ableiten. Die Namen stammen aus Community-Daten und können falsch sein – es ist ein Hinweis, wo im Spiel es passiert, keine Ursache.", classified, result.Crashes.Count),
             null,
-            groups.Select(g => $"{g.Key}: {g.Count()}×").ToList()));
+            groups.Select(g => $"{g.Key}: {g.Count()}×").ToList()) { ExpertOnly = true });
     }
 
     private static void ApplyPatternRules(AnalysisResult result)
@@ -401,7 +426,12 @@ public static class CrashAnalyzer
                 L.F("Gleicher Absturz {0}× wiederholt: {1}", g.Count(), g.Key),
                 L.F("Immer an derselben Stelle ({0}: {1}). Das ist ein reproduzierbarer Fehler, kein Zufall – meist eine bestimmte Mod oder ein bestimmter Ort/Spielstand.", ModuleClassifier.KindLabel(first.FaultKind), first.FaultLabel),
                 null,
-                g.Select(c => L.F("{0:g}", c.Report.Time)).ToList()));
+                g.Select(c => L.F("{0:g}", c.Report.Time)).ToList())
+            {
+                Signature = g.Key,
+                PlainTitle = L.F("Derselbe Absturz ist {0}× passiert", g.Count()),
+                Plain = L.T("Immer an der gleichen Stelle. Das ist kein Zufall und lässt sich meist beheben – oft ist es eine bestimmte Mod oder ein bestimmter Ort in der Spielwelt."),
+            });
         }
 
         // Absturzstelle fest an eine Mod gekoppelt: dieselbe Signatur, und fast jedes Mal dieselbe Mod auf dem Stack
@@ -418,7 +448,12 @@ public static class CrashAnalyzer
                 L.F("Diese Absturzstelle trat {0}× auf – und {1}× davon lag „{2}“ im Aufrufpfad. Eine so feste Kopplung ist kein Zufall: Die Mod ruft diesen Teil der Engine auf und übergibt dabei offenbar ungültige Daten.", g.Count(), coupled.Count, coupled.Name),
                 L.F("„{0}“ testweise deaktivieren. Bleiben diese Abstürze danach aus, ist die Ursache bestätigt – dann nach einem Update suchen oder die Mod weglassen.", coupled.Name),
                 g.Select(c => L.F("{0:g}", c.Report.Time)).ToList())
-            { Category = "Ursache" });
+            {
+                Category = "Ursache",
+                Signature = g.Key,
+                PlainTitle = L.F("„{0}“ steckt bei diesen Abstürzen fast immer mit drin", coupled.Name),
+                Plain = L.F("Derselbe Absturz ist {0}× passiert, und {1}× davon war „{2}“ beteiligt. Das ist sehr wahrscheinlich kein Zufall.", g.Count(), coupled.Count, coupled.Name),
+            });
         }
 
         // Abstürze häufen sich an einem Ort
@@ -429,7 +464,7 @@ public static class CrashAnalyzer
             .Select(g => $"{ModuleClassifier.KindLabel(g.Key)}: {g.Count()}×").ToList();
         if (byKind.Count > 0)
             result.PatternFindings.Add(new Finding(Severity.Info, L.T("Wo die Abstürze passieren"),
-                L.T("Verteilung nach abstürzendem Modul:"), null, byKind));
+                L.T("Verteilung nach abstürzendem Modul:"), null, byKind) { ExpertOnly = true });
 
         // Welche Mods tauchen über viele Abstürze hinweg auf dem Stack auf?
         var modFreq = crashes
@@ -486,14 +521,16 @@ public static class CrashAnalyzer
             int shortUptime = cl.Count(c => c.Report.UptimeSeconds is < 300);
 
             var detail = L.F("{0} von {1} Abstürzen mit bekannter Position passierten {2} (Umkreis {3:F0} m). ", cl.Count, located.Count, where, ClusterRadius);
-            string rec;
+            string rec, plain;
             if (sameSpot >= 3 && shortUptime >= cl.Count / 2)
             {
+                plain = L.T("Mehrere Abstürze passierten an exakt derselben Stelle, kurz nach dem Laden. Das ist typisch für einen Spielstand, der genau dort steht.");
                 detail += L.T("Mehrere davon an exakt derselben Stelle und kurz nach dem Laden – typisch für einen Spielstand, der genau dort steht und beim Laden immer wieder abstürzt.");
                 rec = L.T("Einen älteren Spielstand an einem anderen Ort laden. Hilft das, liegt es an Objekten/Mods, die an diesem Ort geladen werden.");
             }
             else
             {
+                plain = L.T("Immer wieder stürzt das Spiel an derselben Stelle der Spielwelt ab. Das deutet meist auf Mods hin, die dort Inhalte hinzufügen (Garagen, Wohnungen, Fahrzeuge, NPCs).");
                 detail += L.T("Ein Ort, an dem es immer wieder kracht, deutet auf Mods hin, die dort Inhalte hinzufügen (Garagen, Wohnungs-Deko, Fahrzeuge, NPCs) – oder auf eine dort geladene Szene, die mit Mods kollidiert.");
                 rec = L.T("Prüfen, welche Mods diesen Ort verändern (z. B. Garagen-, Wohnungs- oder Fahrzeug-Mods) und diese testweise deaktivieren. Hinweise auf defekte Mod-Inhalte stehen unter „Mods & System“.");
             }
@@ -502,7 +539,11 @@ public static class CrashAnalyzer
                 detail, rec,
                 cl.Select(c => L.F("{0:dd.MM. HH:mm}  Höhe {1,4:F0} m  {2}  nach {3}", c.Report.Time, c.Report.Position!.Value.Z, c.Signature,
                     TimeSpan.FromSeconds(c.Report.UptimeSeconds ?? 0).ToString(@"h\:mm\:ss"))).ToList())
-            { Category = "Ort" });
+            {
+                Category = "Ort",
+                PlainTitle = L.F("{0}× Absturz an derselben Stelle in der Spielwelt", cl.Count),
+                Plain = plain,
+            });
         }
     }
 

@@ -168,7 +168,8 @@ public sealed class FixEvaluator
     private static string Hours(TimeSpan t) =>
         t.TotalMinutes < 90 ? L.F("{0:F0} Min.", Math.Max(0, t.TotalMinutes)) : L.F("{0:F1} Std.", t.TotalHours);
 
-    private static HashSet<string> IndexModFiles(CyberpunkInstall install, IReadOnlyList<string> extraRoots)
+    /// <summary>Dateinamen aller Mod-Dateien, die gerade im Spiel „aktiv“ sind (auch von der Mod-Suche genutzt).</summary>
+    public static HashSet<string> IndexModFiles(CyberpunkInstall install, IReadOnlyList<string> extraRoots)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         void Add(string dir, SearchOption opt)

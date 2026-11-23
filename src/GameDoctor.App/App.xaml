@@ -17,6 +17,9 @@
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>
             <local:NullToCollapsedConverter x:Key="NullToCollapsed"/>
             <local:ShareToStarConverter x:Key="ShareToStar"/>
+            <local:FindingTextConverter x:Key="FindingText"/>
+            <local:FindingVisibilityConverter x:Key="FindingVisibility"/>
+            <local:TechnicalVisibilityConverter x:Key="TechnicalVisibility"/>
 
             <!-- Karte / Panel in der Form des Skins -->
             <Style x:Key="Card" TargetType="local:ShapeBorder">
@@ -366,6 +369,12 @@
             <!-- Karte für eine Erkenntnis -->
             <DataTemplate x:Key="FindingTemplate">
                 <local:ShapeBorder Style="{StaticResource Card}" Margin="0,0,0,10">
+                    <local:ShapeBorder.Visibility>
+                        <MultiBinding Converter="{StaticResource FindingVisibility}" ConverterParameter="card">
+                            <Binding/>
+                            <Binding Path="Expert" Source="{x:Static local:ViewMode.Instance}"/>
+                        </MultiBinding>
+                    </local:ShapeBorder.Visibility>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="4"/>
@@ -378,11 +387,30 @@
                                 <Border Background="{Binding Severity, Converter={StaticResource SeverityBrush}}" CornerRadius="{DynamicResource CornerS}" Padding="6,1" Margin="0,0,10,0" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Severity, Converter={StaticResource SeverityLabel}}" Foreground="#111" FontSize="11" FontWeight="SemiBold"/>
                                 </Border>
-                                <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" FontFamily="{DynamicResource HeadFont}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                <TextBlock FontSize="14" FontWeight="SemiBold" FontFamily="{DynamicResource HeadFont}" VerticalAlignment="Center" TextWrapping="Wrap">
+                                    <TextBlock.Text>
+                                        <MultiBinding Converter="{StaticResource FindingText}" ConverterParameter="title">
+                                            <Binding/>
+                                            <Binding Path="Expert" Source="{x:Static local:ViewMode.Instance}"/>
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
                             </StackPanel>
-                            <TextBlock Text="{Binding Detail}" Margin="0,8,0,0" Foreground="{DynamicResource TextSoft}" LineHeight="20" TextWrapping="Wrap"/>
-                            <ItemsControl ItemsSource="{Binding Evidence}" Margin="0,6,0,0"
-                                          Visibility="{Binding Evidence, Converter={StaticResource NullToCollapsed}}">
+                            <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource TextSoft}" LineHeight="20" TextWrapping="Wrap">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource FindingText}" ConverterParameter="detail">
+                                        <Binding/>
+                                        <Binding Path="Expert" Source="{x:Static local:ViewMode.Instance}"/>
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <ItemsControl ItemsSource="{Binding Evidence}" Margin="0,6,0,0">
+                                <ItemsControl.Visibility>
+                                    <MultiBinding Converter="{StaticResource FindingVisibility}" ConverterParameter="evidence">
+                                        <Binding/>
+                                        <Binding Path="Expert" Source="{x:Static local:ViewMode.Instance}"/>
+                                    </MultiBinding>
+                                </ItemsControl.Visibility>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <DockPanel Margin="0,2,0,0">

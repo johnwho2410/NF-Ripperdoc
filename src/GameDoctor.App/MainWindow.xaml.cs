@@ -184,16 +184,54 @@ public partial class MainWindow : Window
     /// <param name="redetectMods">Mod-Liste frisch einlesen – nötig, nachdem der Spieler in Vortex/MO2 etwas geändert hat.</param>
     private async Task RefreshFixesAsync(AnalysisResult result, bool redetectMods = false)
     {
-        var vms = await Task.Run(() =>
+        var (vms, steps) = await Task.Run(() =>
         {
             _inventory = redetectMods && result.Install is not null ? ModInventory.Detect(result.Install) : result.Inventory;
             var ledger = PlaySessionLedger.Load();
             ledger.Harvest(result.Install, result.Crashes);
             try { ledger.Save(); } catch { /* nicht kritisch */ }
             var evaluator = new FixEvaluator(result.Crashes, ledger, result.Install, _inventory.ExtraRoots);
-            return FixAttemptStore.Load().Select(a => new FixAttemptViewModel(a, evaluator.Evaluate(a), _inventory, result.Install)).ToList();
+            var evaluated = FixAttemptStore.Load().Select(a => (Attempt: a, Eval: evaluator.Evaluate(a))).ToList();
+            var viewModels = evaluated.Select(x => new FixAttemptViewModel(x.Attempt, x.Eval, _inventory, result.Install)).ToList();
+            return (viewModels, NextStepAdvisor.Build(result, evaluated, BisectStore.Load()));
         });
         _vm.SetFixes(vms);
+        _vm.SetNextSteps(steps);
+    }
+
+    private async void OpenBisect_Click(object sender, RoutedEventArgs e) => await OpenBisectAsync();
+
+    /// <summary>Öffnet den Assistenten „Welche Mod ist es?“.</summary>
+    private async Task OpenBisectAsync()
+    {
+        if (_vm.Result is not { } result) return;
+        var win = new BisectWindow(result, _inventory, async () => { await RunAnalysisAsync(); return _vm.Result; }) { Owner = this };
+        win.ShowDialog();
+        if (win.Changed && _vm.Result is { } current) await RefreshFixesAsync(current);
+    }
+
+    /// <summary>Knopf in der Karte „Dein nächster Schritt“.</summary>
+    private async void NextStep_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: NextStepViewModel vm } || _vm.Result is not { } result) return;
+        switch (vm.Step.Action)
+        {
+            case NextStepAction.TryFix when vm.Step.Crash is { } crash:
+            {
+                var dlg = new FixAttemptWindow(crash, result, _inventory, result.Classifier) { Owner = this };
+                if (dlg.ShowDialog() != true || dlg.Created is null) return;
+                FixAttemptStore.Upsert(dlg.Created);
+                await RefreshFixesAsync(result);
+                Tabs.SelectedIndex = 4;
+                break;
+            }
+            case NextStepAction.OpenFixes:
+                Tabs.SelectedIndex = 4;
+                break;
+            case NextStepAction.OpenBisect:
+                await OpenBisectAsync();
+                break;
+        }
     }
 
     private async void FixRecheck_Click(object sender, RoutedEventArgs e)

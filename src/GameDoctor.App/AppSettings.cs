@@ -12,6 +12,9 @@ public sealed class AppSettings
     /// <summary>„de“ oder „en“; null = beim ersten Start nach der Windows-Sprache wählen.</summary>
     public string? Language { get; set; }
 
+    /// <summary>Experten-Ansicht (Adressen, Fehlercodes, Statistik) statt der einfachen Ansicht.</summary>
+    public bool ExpertView { get; set; }
+
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public OverlayCorner OverlayCorner { get; set; } = OverlayCorner.TopLeft;
 
