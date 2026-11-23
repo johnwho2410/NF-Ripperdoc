@@ -259,6 +259,10 @@ static void DumpDetails(string path, string? gamePath)
     Console.WriteLine($"Exception 0x{d.ExceptionCode:X8} @ 0x{d.ExceptionAddress:X}  Thread {d.CrashingThreadId}");
     Console.WriteLine($"Parameter: {string.Join(", ", d.ExceptionParameters.Select(p => $"0x{p:X}"))}");
     Console.WriteLine($"Modul: {d.FaultingModule?.Path ?? "-"} +0x{d.FaultingOffset:X}");
+    Console.WriteLine($"Adress-Klasse: {d.AddressClass}  Zeiger-Register: {(d.BaseRegister is null ? "-" : $"{d.BaseRegister} = 0x{d.BaseRegisterValue:X}")}");
+    if (GameDoctor.Core.Analysis.CrashAnalyzer.AddressHint(d) is { } hint) Console.WriteLine($"Hinweis: {hint}");
+    Console.WriteLine($"Objekte in Registern: {string.Join(", ", d.RegisterObjects.Select(o => $"{o.Register}:+0x{o.ClassOffset:X}"))}");
+    Console.WriteLine($"Objekt-Klassen auf dem Stack: {string.Join(", ", d.ObjectClasses.Select(o => $"+0x{o.ClassOffset:X} x{o.Count}"))}");
     Console.WriteLine($"{d.Modules.Count} Module, {d.StackHits.Count} Stack-Treffer:");
     foreach (var h in d.StackHits)
         Console.WriteLine($"  {cls.Classify(h.Module),-15} {h.Module.Name}+0x{h.Offset:X}");

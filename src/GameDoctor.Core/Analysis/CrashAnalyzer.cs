@@ -269,11 +269,37 @@ public static class CrashAnalyzer
         {
             var op = d.ExceptionParameters[0] switch { 0 => L.T("lesen"), 1 => L.T("schreiben"), 8 => L.T("ausführen"), _ => L.T("zugreifen") };
             var addr = d.ExceptionParameters[1];
-            return addr < 0x10000
+            var text = addr < 0x10000
                 ? L.F("Speicherzugriffsfehler: Versuch, an Adresse 0x{0:X} zu {1} – ein Null-Zeiger (ein Objekt, das es nicht gibt).", addr, op)
                 : L.F("Speicherzugriffsfehler: Versuch, an Adresse 0x{0:X} zu {1} – auf ungültigen/freigegebenen Speicher.", addr, op);
+            return AddressHint(d) is { } extra ? text + " " + extra : text;
         }
         return $"{name} (0x{d.ExceptionCode:X8}).";
+    }
+
+    /// <summary>
+    /// Kurze Einordnung der Zugriffsadresse und des Zeiger-Registers. Beschreibt nur, wie der Zeigerwert aussah – ob er vorher überschrieben
+    /// oder freigegeben wurde, lässt sich aus einem einzelnen Dump nicht beweisen.
+    /// </summary>
+    public static string? AddressHint(DumpAnalysis d)
+    {
+        var reg = d.BaseRegister is { } r ? $"{r} = 0x{d.BaseRegisterValue:X}" : null;
+        return d.AddressClass switch
+        {
+            FaultAddressClass.NullPage when d.BaseRegister is not null && d.BaseRegisterValue == 0 =>
+                L.F("Das Zeiger-Register ({0}) war 0: ein nicht gesetzter Zeiger.", reg),
+            FaultAddressClass.NullPage when d.BaseRegister is not null && d.BaseRegisterValue < 0x10000 =>
+                L.F("Das Zeiger-Register ({0}) enthielt eine kleine Zahl statt eines Zeigers – das Objekt wurde vermutlich überschrieben oder falsch gelesen (kein Beweis).", reg),
+            FaultAddressClass.NotAPointer =>
+                L.T("Die Adresse ist kein gültiger Zeigerwert – der Zeiger wurde vermutlich überschrieben."),
+            FaultAddressClass.HeapLikeUnmapped =>
+                reg is null
+                    ? L.T("Die Adresse sieht wie ein normaler Heap-Zeiger dieses Prozesses aus, der Speicher war aber nicht mehr vorhanden – typisch für einen Zeiger auf ein bereits freigegebenes Objekt (kein Beweis).")
+                    : L.F("Die Adresse sieht wie ein normaler Heap-Zeiger dieses Prozesses aus ({0}), der Speicher war aber nicht mehr vorhanden – typisch für einen Zeiger auf ein bereits freigegebenes Objekt (kein Beweis).", reg),
+            FaultAddressClass.InModule =>
+                L.T("Die Adresse liegt im Abbild eines geladenen Moduls (z. B. Schreiben auf Code oder schreibgeschützte Daten)."),
+            _ => null,
+        };
     }
 
     // Übersetzt über L.T(code switch …) – für die Vollständigkeitsprüfung hier aufgeführt:

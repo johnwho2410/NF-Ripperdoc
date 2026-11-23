@@ -41,6 +41,29 @@ public sealed record DumpModule(string Path, ulong Base, uint Size, string? File
 
 public sealed record StackHit(DumpModule Module, ulong Offset);
 
+/// <summary>Wie die Adresse eines Speicherzugriffsfehlers einzuordnen ist (aus der Adresse und den Registern abgeleitet).</summary>
+public enum FaultAddressClass
+{
+    /// <summary>Nicht bestimmbar (kein Speicherzugriffsfehler oder keine Daten).</summary>
+    Unknown,
+    /// <summary>Unterhalb von 0x10000: Null-Zeiger, evtl. plus Versatz.</summary>
+    NullPage,
+    /// <summary>Kein gültiger Zeigerwert (außerhalb des 48-Bit-Adressraums).</summary>
+    NotAPointer,
+    /// <summary>Ähnelt den Heap-Adressen dieses Prozesses, der Speicher war aber nicht mehr vorhanden.</summary>
+    HeapLikeUnmapped,
+    /// <summary>Gültig aussehende Adresse ohne Bezug zu bekannten Adressen des Prozesses.</summary>
+    OtherUnmapped,
+    /// <summary>Adresse liegt im Abbild eines geladenen Moduls (z. B. Schreiben auf Code).</summary>
+    InModule,
+}
+
+/// <summary>Klassen-Kennzeichen: Adresse (Offset in der Spiel-EXE), auf die das erste Feld mehrerer Objekte zeigt (meist die Funktionstabelle der Klasse).</summary>
+public sealed record ObjectClassHit(ulong ClassOffset, int Count);
+
+/// <summary>Ein Register des abstürzenden Threads, das auf ein Objekt mit Klassen-Kennzeichen zeigt.</summary>
+public sealed record RegisterObject(string Register, ulong ClassOffset);
+
 public sealed class DumpAnalysis
 {
     public uint ExceptionCode { get; init; }
@@ -52,5 +75,14 @@ public sealed class DumpAnalysis
     public IReadOnlyList<DumpModule> Modules { get; init; } = [];
     /// <summary>Rücksprungadressen-Kandidaten vom Stack des abstürzenden Threads (heuristisch, oberste zuerst).</summary>
     public IReadOnlyList<StackHit> StackHits { get; init; } = [];
+    /// <summary>Register des abstürzenden Threads (Rax … R15, Rip).</summary>
+    public IReadOnlyDictionary<string, ulong> Registers { get; init; } = new Dictionary<string, ulong>();
+    public FaultAddressClass AddressClass { get; init; }
+    /// <summary>Register, das die Zugriffsadresse (abzüglich eines kleinen Versatzes) enthielt – das „Zeiger-Register“.</summary>
+    public string? BaseRegister { get; init; }
+    public ulong BaseRegisterValue { get; init; }
+    /// <summary>Häufigste Klassen-Kennzeichen der Objekte, auf die der Stack zeigt (Kandidaten, heuristisch).</summary>
+    public IReadOnlyList<ObjectClassHit> ObjectClasses { get; init; } = [];
+    public IReadOnlyList<RegisterObject> RegisterObjects { get; init; } = [];
     public string? Error { get; init; }
 }

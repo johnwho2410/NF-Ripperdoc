@@ -42,8 +42,8 @@ public sealed class CrashViewModel
         Findings = c.Findings;
         SuspectModules = c.SuspectModules.Select(s => L.F("{0}  ·  {1}  ·  {2}× auf dem Stack", s.Name, ModuleClassifier.KindLabel(s.Kind), s.Hits)).ToList();
 
-        Details =
-        [
+        var rows = new List<DetailRow>
+        {
             new(L.T("Absturzstelle"), c.Signature),
             new(L.T("Fehler"), r.Expression ?? r.ErrorReason ?? "?"),
             new(L.T("Laufzeit bis Absturz"), Uptime),
@@ -52,7 +52,19 @@ public sealed class CrashViewModel
             new(L.T("Grafikkarte"), L.F("{0}  ·  Treiber {1}", r.GpuName ?? "?", r.GpuDriver ?? "?")),
             new(L.T("Raytracing"), r.RayTracing switch { true => L.T("an"), false => L.T("aus"), _ => "?" }),
             new(L.T("Spielversion"), $"Patch {r.Patch ?? "?"}  ·  {r.InternalVersion ?? "?"}"),
-        ];
+        };
+
+        // Aus dem Speicherabbild abgeleitete Hinweise (Zeiger-Register, Objekt-Klassen als Kennzeichen)
+        if (c.Dump is { Error: null } d)
+        {
+            if (d.BaseRegister is not null && d.AddressClass != FaultAddressClass.Unknown)
+                rows.Add(new(L.T("Zeiger-Register"), $"{d.BaseRegister} = 0x{d.BaseRegisterValue:X}"));
+            if (d.RegisterObjects.Count > 0)
+                rows.Add(new(L.T("Objekte in Registern"), string.Join("  ·  ", d.RegisterObjects.Take(4).Select(o => $"{o.Register}: +0x{o.ClassOffset:X}"))));
+            if (d.ObjectClasses.Count > 0)
+                rows.Add(new(L.T("Objekt-Klassen auf dem Stack"), string.Join("  ·  ", d.ObjectClasses.Take(4).Select(o => $"+0x{o.ClassOffset:X} ×{o.Count}"))));
+        }
+        Details = rows;
     }
 
     public CrashCase Case { get; }

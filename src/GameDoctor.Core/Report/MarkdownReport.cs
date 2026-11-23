@@ -53,6 +53,13 @@ public static class MarkdownReport
             sb.AppendLine($"| VRAM | {rep.VramUsedMb?.ToString() ?? "?"} / {rep.VramTotalMb?.ToString() ?? "?"} MB |");
             sb.AppendLine($"| {L.T("GPU / Treiber")} | {rep.GpuName ?? "?"} / {rep.GpuDriver ?? "?"} |");
             sb.AppendLine($"| Patch | {rep.Patch ?? "?"} ({rep.InternalVersion ?? "?"}) |");
+            if (c.Dump is { Error: null } dmp)
+            {
+                if (dmp.BaseRegister is not null && dmp.AddressClass != FaultAddressClass.Unknown)
+                    sb.AppendLine($"| {L.T("Zeiger-Register")} | `{dmp.BaseRegister} = 0x{dmp.BaseRegisterValue:X}` |");
+                if (dmp.ObjectClasses.Count > 0)
+                    sb.AppendLine($"| {L.T("Objekt-Klassen auf dem Stack")} | {string.Join(", ", dmp.ObjectClasses.Take(4).Select(o => $"`+0x{o.ClassOffset:X}` ×{o.Count}"))} |");
+            }
             sb.AppendLine($"| {L.T("Ordner")} | `{rep.Folder}` |");
             sb.AppendLine();
             foreach (var f in c.Findings) WriteFinding(sb, f);

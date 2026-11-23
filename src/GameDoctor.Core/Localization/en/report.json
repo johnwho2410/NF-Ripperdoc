@@ -62,6 +62,8 @@
   "Fehler": "Error",
   "Laufzeit bis Absturz": "Time until crash",
   "Ladezustand": "Loading stage",
+  "- Adress-Einordnung: {0}": "- Address classification: {0}",
+  "- Objekt-Klassen auf dem Stack (Offsets in der Spiel-EXE, Kandidaten): {0}": "- Object classes on the stack (offsets in the game EXE, candidates): {0}",
   "GPU / Treiber": "GPU / driver",
   "Ordner": "Folder",
   "Nicht-Vanilla-Module auf dem Stack": "Non-vanilla modules on the stack",
