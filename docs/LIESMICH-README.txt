@@ -42,3 +42,6 @@ Important
 Lizenz / License
   Copyright (C) 2026 Noisefloor. Freie Software unter der GNU General Public License v3 (siehe LICENSE im Quellcode-Repository:
   https://github.com/johnwho2410/NF-Ripperdoc). / Free software under the GNU General Public License v3.
+
+Danksagung / Credits
+  PresentMon (Intel, MIT). cp2077-symbols (Community-Projekt, MIT): optionale Funktionsnamen fuer Absturzstellen, nur nach Zustimmung geladen. / Optional function names, downloaded only with your consent.

@@ -16,6 +16,8 @@ public sealed class CrashCase
     public string FaultLabel { get; set; } = "?";
     public List<(string Name, ModuleKind Kind, int Hits)> SuspectModules { get; } = [];
     public List<SystemEvent> NearbyEvents { get; } = [];
+    /// <summary>Funktionsnamen der Absturzstelle und des Aufrufpfads – nur wenn die Namen geladen sind und zur Spielversion passen.</summary>
+    public Symbols.CrashSymbols? Symbols { get; set; }
 }
 
 public sealed class AnalysisResult
@@ -35,6 +37,9 @@ public sealed class AnalysisResult
     public List<LocateProbe> LocateProbes { get; set; } = [];
     /// <summary>Welche Datenquellen gefunden wurden und welche fehlen.</summary>
     public List<DataSource> DataSources { get; set; } = [];
+    /// <summary>Ob die optionalen Funktionsnamen geladen sind und zur Spielversion passen.</summary>
+    public Symbols.SymbolStatus SymbolStatus { get; set; }
+    public Symbols.SymbolIndex? SymbolIndex { get; set; }
 }
 
 public sealed class CrashAnalyzerOptions
@@ -71,6 +76,12 @@ public static class CrashAnalyzer
         progress?.Invoke(L.T("Lese Windows-Ereignisanzeige …"));
         result.SystemEvents = WindowsEventScanner.Scan("Cyberpunk2077.exe", TimeSpan.FromDays(options.Days));
 
+        // Optionale Funktionsnamen (Community-Daten): benennen Absturzstellen und ordnen sie Teilsystemen zu
+        var symbols = Symbols.SymbolDatabase.Open(install?.Root, out var symbolStatus);
+        result.SymbolStatus = symbolStatus;
+        result.SymbolIndex = symbols;
+        bool haveSymbols = symbolStatus == Symbols.SymbolStatus.Ready && symbols is not null;
+
         progress?.Invoke(L.T("Lese Crashreports …"));
         var reports = RedCrashReport.LoadAll(options.QueueDir).Where(r => r.Time >= since).ToList();
         int i = 0;
@@ -79,6 +90,7 @@ public static class CrashAnalyzer
             progress?.Invoke(L.F("Analysiere Absturz {0}/{1}: {2:dd.MM. HH:mm}", ++i, reports.Count, report.Time));
             var dump = report.DumpPath is not null ? MinidumpReader.Analyze(report.DumpPath) : null;
             var c = new CrashCase { Report = report, Dump = dump };
+            if (haveSymbols && dump is not null) c.Symbols = Symbols.SymbolDatabase.Describe(dump, symbols!);
             ApplyCrashRules(c, classifier, result.SystemEvents);
             result.Crashes.Add(c);
         }
@@ -90,6 +102,7 @@ public static class CrashAnalyzer
         }
 
         ApplyPatternRules(result);
+        ApplySubsystemPattern(result);
         ApplyEnvironmentRules(result, install);
         result.DataSources = DataSourceReport.Build(result);
         return result;
@@ -209,7 +222,9 @@ public static class CrashAnalyzer
             {
                 c.Findings.Add(new Finding(Severity.Info,
                     L.F("Absturz {0}", where),
-                    L.F("{0} Auf dem Stack wurden keine Mods gefunden. Ohne Debug-Symbole von CD Projekt lässt sich die genaue Funktion nicht benennen – die Signatur {1} kann aber mit anderen Abstürzen verglichen werden.", exceptionText, c.Signature),
+                    c.Symbols?.Site is not null
+                        ? L.F("{0} Auf dem Stack wurden keine Mods gefunden. Die Funktionsnamen (Community-Daten) stehen bei den technischen Daten; die Signatur {1} kann mit anderen Abstürzen verglichen werden.", exceptionText, c.Signature)
+                        : L.F("{0} Auf dem Stack wurden keine Mods gefunden. Ohne Debug-Symbole von CD Projekt lässt sich die genaue Funktion nicht benennen – die Signatur {1} kann aber mit anderen Abstürzen verglichen werden.", exceptionText, c.Signature),
                     null)
                 { Category = "Ursache" });
             }
@@ -353,6 +368,20 @@ public static class CrashAnalyzer
     // ------------------------------------------------------------------
     // Regeln über alle Abstürze hinweg
     // ------------------------------------------------------------------
+
+    /// <summary>Gruppiert Abstürze nach Teilsystem. Je mehr Abstürze einem Teilsystem zugeordnet sind, desto aussagekräftiger – einzelne Absturzstellen sind meist Einzelfälle.</summary>
+    private static void ApplySubsystemPattern(AnalysisResult result)
+    {
+        var groups = result.Crashes.Where(c => c.Symbols?.Subsystem is not null)
+            .GroupBy(c => c.Symbols!.Subsystem!.Label).OrderByDescending(g => g.Count()).ToList();
+        int classified = groups.Sum(g => g.Count());
+        if (classified < 3) return;
+        result.PatternFindings.Add(new Finding(Severity.Info, L.T("Abstürze nach Teilsystem"),
+            L.F("Bei {0} von {1} Abstürzen ließ sich aus den Funktionsnamen im Aufrufpfad ein Teilsystem des Spiels ableiten. Die Namen stammen aus Community-Daten und können falsch sein – es ist ein Hinweis, wo im Spiel es passiert, keine Ursache.", classified, result.Crashes.Count),
+            null,
+            groups.Select(g => $"{g.Key}: {g.Count()}×").ToList()));
+    }
+
     private static void ApplyPatternRules(AnalysisResult result)
     {
         var crashes = result.Crashes;

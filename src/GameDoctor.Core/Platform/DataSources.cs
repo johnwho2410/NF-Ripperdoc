@@ -98,6 +98,28 @@ public static class DataSourceReport
             Log(L.T("ArchiveXL-Log"), "ArchiveXL", L.T("ArchiveXL nicht installiert."));
         }
 
+        // Funktionsnamen (optional, Community-Daten)
+        if (inst is not null)
+        {
+            switch (r.SymbolStatus)
+            {
+                case Symbols.SymbolStatus.Ready when r.SymbolIndex is { } ix:
+                    list.Add(new DataSource(L.T("Funktionsnamen"), DataSourceStatus.Ok,
+                        L.F("{0:N0} Namen · passen zur Spielversion ({1} von {2} Stichproben stimmen)", ix.NamedAddresses, ix.VerifiedMatches, ix.VerifiedTotal)));
+                    break;
+                case Symbols.SymbolStatus.WrongVersion:
+                    list.Add(new DataSource(L.T("Funktionsnamen"), DataSourceStatus.Partial,
+                        L.T("Geladen, passen aber nicht zur installierten Spielversion – es werden keine Namen angezeigt."),
+                        L.T("Nach einem Spiel-Update gibt es die Namen erst wieder, wenn das Community-Projekt sie für die neue Version veröffentlicht hat.")));
+                    break;
+                default:
+                    list.Add(new DataSource(L.T("Funktionsnamen"), DataSourceStatus.Info,
+                        L.T("Nicht geladen (optional)."),
+                        L.T("Mit den Funktionsnamen kann GameDoctor Absturzstellen benennen und einem Teilsystem des Spiels zuordnen. „Funktionsnamen laden …“ lädt sie nach deiner Zustimmung (ca. 59 MB).")));
+                    break;
+            }
+        }
+
         // Windows
         list.Add(new DataSource(L.T("Windows-Ereignisanzeige"), DataSourceStatus.Info,
             L.F("{0} relevante Ereignisse im Zeitraum (Programmabstürze, Treiber-Timeouts, Hardwarefehler, Neustarts)", r.SystemEvents.Count)));

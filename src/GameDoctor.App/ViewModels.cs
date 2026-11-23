@@ -54,6 +54,15 @@ public sealed class CrashViewModel
             new(L.T("Spielversion"), $"Patch {r.Patch ?? "?"}  ·  {r.InternalVersion ?? "?"}"),
         };
 
+        // Funktionsnamen (optional, Community-Daten): Absturzstelle benennen und einem Teilsystem zuordnen
+        if (c.Symbols is { } sym)
+        {
+            if (sym.Site is not null)
+                rows.Add(new(L.T("Funktion"), GameDoctor.Core.Symbols.SymbolFormat.Short(sym.Site, 90)));
+            if (sym.Subsystem is not null)
+                rows.Add(new(L.T("Teilsystem"), sym.SubsystemFunction is null ? sym.Subsystem.Label : $"{sym.Subsystem.Label}  ·  {sym.SubsystemFunction}"));
+        }
+
         // Aus dem Speicherabbild abgeleitete Hinweise (Zeiger-Register, Objekt-Klassen als Kennzeichen)
         if (c.Dump is { Error: null } d)
         {

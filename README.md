@@ -36,3 +36,8 @@ Early beta, Cyberpunk 2077 only. Unofficial fan-made tool, not affiliated with o
 Copyright (C) 2026 Noisefloor
 
 This program is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License](LICENSE) as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the license for details.
+
+## Credits
+
+- [PresentMon](https://github.com/GameTechDev/PresentMon) by Intel (MIT license) – frame capture, downloaded on request.
+- [cp2077-symbols](https://codeberg.org/bartmoss/cp2077-symbols) (MIT license, unofficial community project) – optional function names for crash sites. GameDoctor downloads the names file only after your confirmation, verifies it by checksum, and uses it locally together with the `cyberpunk2077_addresses.json` that ships with the game. Names can be wrong; they are a hint, not a diagnosis.

@@ -165,6 +165,13 @@ public static class AiPromptBuilder
             var frames = d.StackHits.Take(25).Select(h => $"{h.Module.Name}+0x{h.Offset:X}");
             sb.AppendLine(L.F("- Rücksprungadressen auf dem Stack (oben = zuletzt): {0}", string.Join(", ", frames)));
             if (CrashAnalyzer.AddressHint(d) is { } hint) sb.AppendLine(L.F("- Adress-Einordnung: {0}", hint));
+            if (c.Symbols is { } sy)
+            {
+                if (sy.Site is not null) sb.AppendLine(L.F("- Funktion an der Absturzstelle (Community-Name): {0}", Symbols.SymbolFormat.Short(sy.Site, 140)));
+                if (sy.Subsystem is not null) sb.AppendLine(L.F("- Teilsystem (aus Funktionsnamen abgeleitet, kann falsch sein): {0}", sy.Subsystem.Label));
+                var path = Symbols.SymbolFormat.CallPath(sy, 8, 100).ToList();
+                if (path.Count > 0) sb.AppendLine(L.F("- Benannter Aufrufpfad (oben = zuletzt): {0}", string.Join(" ← ", path)));
+            }
             if (d.ObjectClasses.Count > 0)
                 sb.AppendLine(L.F("- Objekt-Klassen auf dem Stack (Offsets in der Spiel-EXE, Kandidaten): {0}", string.Join(", ", d.ObjectClasses.Take(4).Select(o => $"+0x{o.ClassOffset:X} ×{o.Count}"))));
         }

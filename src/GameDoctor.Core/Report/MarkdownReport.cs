@@ -53,6 +53,11 @@ public static class MarkdownReport
             sb.AppendLine($"| VRAM | {rep.VramUsedMb?.ToString() ?? "?"} / {rep.VramTotalMb?.ToString() ?? "?"} MB |");
             sb.AppendLine($"| {L.T("GPU / Treiber")} | {rep.GpuName ?? "?"} / {rep.GpuDriver ?? "?"} |");
             sb.AppendLine($"| Patch | {rep.Patch ?? "?"} ({rep.InternalVersion ?? "?"}) |");
+            if (c.Symbols is { } sy)
+            {
+                if (sy.Site is not null) sb.AppendLine($"| {L.T("Funktion")} | `{Symbols.SymbolFormat.Short(sy.Site, 140).Replace("|", "\\|")}` |");
+                if (sy.Subsystem is not null) sb.AppendLine($"| {L.T("Teilsystem")} | {sy.Subsystem.Label} ({L.T("aus Community-Namen abgeleitet, kann falsch sein")}) |");
+            }
             if (c.Dump is { Error: null } dmp)
             {
                 if (dmp.BaseRegister is not null && dmp.AddressClass != FaultAddressClass.Unknown)
@@ -63,6 +68,15 @@ public static class MarkdownReport
             sb.AppendLine($"| {L.T("Ordner")} | `{rep.Folder}` |");
             sb.AppendLine();
             foreach (var f in c.Findings) WriteFinding(sb, f);
+            if (c.Symbols is { } cs && Symbols.SymbolFormat.CallPath(cs, 12, 120).ToList() is { Count: > 0 } named)
+            {
+                sb.AppendLine($"<details><summary>{L.T("Benannter Aufrufpfad (Community-Namen, oben = zuletzt)")}</summary>");
+                sb.AppendLine();
+                foreach (var line in named) sb.AppendLine($"- `{line.Replace("`", "'")}`");
+                sb.AppendLine();
+                sb.AppendLine("</details>");
+                sb.AppendLine();
+            }
             if (c.SuspectModules.Count > 0)
             {
                 sb.AppendLine($"<details><summary>{L.T("Nicht-Vanilla-Module auf dem Stack")}</summary>");

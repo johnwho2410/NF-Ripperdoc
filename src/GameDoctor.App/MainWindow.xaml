@@ -394,6 +394,8 @@
                             <Button Content="{local:T 'MO2-Instanz festlegen …'}" Click="SetMo2_Click" Margin="0,0,8,0"
                                     ToolTip="{local:T 'Nur nötig, wenn du Mod Organizer 2 portabel nutzt und es nicht automatisch erkannt wird'}"/>
                             <Button Content="{local:T 'Suchen'}" Click="SearchGame_Click" Margin="0,0,8,0"/>
+                            <Button Content="{local:T 'Funktionsnamen laden …'}" Click="DownloadSymbols_Click" Margin="0,0,8,0"
+                                    ToolTip="{local:T 'Optional: benennt Absturzstellen und ordnet sie einem Teilsystem zu (Community-Daten, ca. 59 MB)'}"/>
                             <Button Content="{local:T 'Automatisch erkennen'}" Click="ResetPaths_Click"
                                     ToolTip="{local:T 'Festgelegte Pfade entfernen und wieder automatisch suchen'}"/>
                         </StackPanel>

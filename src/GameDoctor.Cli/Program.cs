@@ -57,6 +57,35 @@ if (args.Length > 0 && args[0] == "sources")
     return;
 }
 
+// Funktionsnamen: gamedoctor symbols [--game <Ordner>] [--install] [--from <names_by_address.csv>]
+// Ohne --install wird nur der Zustand gezeigt. --install lädt die Namensdatei (59 MB, nur auf ausdrücklichen Aufruf); --from nutzt eine lokale CSV.
+if (args.Length > 0 && args[0] == "symbols")
+{
+    string? gameArg = null, fromCsv = null; bool install = false;
+    for (int i = 1; i < args.Length; i++)
+        switch (args[i])
+        {
+            case "--game": gameArg = args[++i]; break;
+            case "--from": fromCsv = args[++i]; break;
+            case "--install": install = true; break;
+        }
+    var root = gameArg ?? GameDoctor.Core.Games.Cyberpunk.CyberpunkInstall.Locate()?.Root;
+    if (root is null) { Console.WriteLine("Spielordner nicht gefunden (--game <Ordner> angeben)."); return; }
+    var progress = new Progress<string>(m => Console.Write($"\r{m,-80}"));
+    if (install)
+    {
+        var started = DateTime.Now;
+        var built = fromCsv is not null
+            ? GameDoctor.Core.Symbols.SymbolDatabase.BuildFromFile(fromCsv, root, progress)
+            : await GameDoctor.Core.Symbols.SymbolDatabase.InstallAsync(root, progress);
+        Console.WriteLine($"\rIndex gebaut in {(DateTime.Now - started).TotalSeconds:F0} s: {built.NamedAddresses:N0} Namen, {built.FunctionStarts:N0} Funktionsanfänge, Stichprobe {built.VerifiedMatches}/{built.VerifiedTotal}.".PadRight(100));
+    }
+    var idx = GameDoctor.Core.Symbols.SymbolDatabase.Open(root, out var st);
+    Console.WriteLine($"Status: {st}  (Index: {GameDoctor.Core.Symbols.SymbolDatabase.IndexPath})");
+    if (idx is not null) Console.WriteLine($"Namen: {idx.NamedAddresses:N0} · Stichprobe {idx.VerifiedMatches}/{idx.VerifiedTotal} · Spielversion {idx.LinkerTimestamp}");
+    return;
+}
+
 // KI-Prompt: gamedoctor prompt [--days 30] [--out prompt.txt]
 // Community-Fingerabdrücke: gamedoctor fingerprint [--days 30] [--save]
 // Zeigt exakt, was später anonym geteilt werden könnte – und was der Datenschutz-Wächter blockiert.
@@ -263,6 +292,13 @@ static void DumpDetails(string path, string? gamePath)
     if (GameDoctor.Core.Analysis.CrashAnalyzer.AddressHint(d) is { } hint) Console.WriteLine($"Hinweis: {hint}");
     Console.WriteLine($"Objekte in Registern: {string.Join(", ", d.RegisterObjects.Select(o => $"{o.Register}:+0x{o.ClassOffset:X}"))}");
     Console.WriteLine($"Objekt-Klassen auf dem Stack: {string.Join(", ", d.ObjectClasses.Select(o => $"+0x{o.ClassOffset:X} x{o.Count}"))}");
+    if (install is not null && GameDoctor.Core.Symbols.SymbolDatabase.Open(install.Root, out var symStatus) is { } symIndex && symStatus == GameDoctor.Core.Symbols.SymbolStatus.Ready
+        && GameDoctor.Core.Symbols.SymbolDatabase.Describe(d, symIndex) is { } sym)
+    {
+        Console.WriteLine($"Funktion an der Absturzstelle: {sym.Site?.DisplayName ?? "(unbenannt)"}{(sym.Site?.Folded == true ? "  (mehrere identische Funktionen)" : "")}");
+        Console.WriteLine($"Teilsystem: {sym.Subsystem?.Label ?? "(nicht ableitbar)"}{(sym.SubsystemFunction is null ? "" : "  ← " + sym.SubsystemFunction)}");
+        foreach (var fr in sym.Frames.Take(12)) Console.WriteLine($"  +0x{fr.Offset:X}: {fr.Function.DisplayName ?? "(unbenannt)"}{(fr.Function.Folded ? "  [mehrere identische Funktionen]" : "")}");
+    }
     Console.WriteLine($"{d.Modules.Count} Module, {d.StackHits.Count} Stack-Treffer:");
     foreach (var h in d.StackHits)
         Console.WriteLine($"  {cls.Classify(h.Module),-15} {h.Module.Name}+0x{h.Offset:X}");

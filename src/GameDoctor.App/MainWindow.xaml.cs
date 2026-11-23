@@ -11,6 +11,7 @@ using GameDoctor.Core.Community;
 using GameDoctor.Core.Games.Cyberpunk;
 using GameDoctor.Core.Performance;
 using GameDoctor.Core.Report;
+using GameDoctor.Core.Symbols;
 using Microsoft.Win32;
 
 namespace GameDoctor.App;
@@ -381,6 +382,40 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            _vm.Status = L.F("Download fehlgeschlagen: {0}", ex.Message);
+            MessageBox.Show(this, ex.Message, L.T("Download fehlgeschlagen"), MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>Lädt die optionalen Funktionsnamen (Community-Projekt cp2077-symbols) – nur nach ausdrücklicher Zustimmung.</summary>
+    private async void DownloadSymbols_Click(object sender, RoutedEventArgs e)
+    {
+        var root = _vm.Result?.Install?.Root;
+        if (root is null)
+        {
+            MessageBox.Show(this, L.T("Cyberpunk 2077 wurde nicht gefunden. Bitte zuerst den Spielordner festlegen."), L.T("Funktionsnamen laden"), MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var answer = MessageBox.Show(this,
+            L.F("Mit den Funktionsnamen kann GameDoctor Absturzstellen benennen und einem Teilsystem des Spiels zuordnen (z. B. „Sinne“ oder „Waffen“).\n\nDie Namen stammen vom Community-Projekt cp2077-symbols (MIT-Lizenz, inoffiziell, für Patch 2.5):\n{0}\n\nHerunterladen werden ca. 59 MB von codeberg.org. Die Datei wird per Prüfsumme kontrolliert, lokal in\n{1}\nabgelegt und mit der Adressdatei deines Spiels abgeglichen. Es wird nichts gesendet. Die Namen können falsch sein.\n\nFortfahren?",
+                SymbolDatabase.ProjectUrl, SymbolDatabase.Dir),
+            L.T("Funktionsnamen laden"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+
+        try
+        {
+            _vm.IsBusy = true;
+            var progress = new Progress<string>(msg => _vm.Status = msg);
+            await SymbolDatabase.InstallAsync(root, progress);
+            _vm.IsBusy = false;
+            await RunAnalysisAsync();
+            _vm.Status = _vm.Result?.SymbolStatus == SymbolStatus.Ready
+                ? L.T("Funktionsnamen geladen.")
+                : L.T("Funktionsnamen geladen, passen aber nicht zur installierten Spielversion.");
+        }
+        catch (Exception ex)
+        {
+            _vm.IsBusy = false;
             _vm.Status = L.F("Download fehlgeschlagen: {0}", ex.Message);
             MessageBox.Show(this, ex.Message, L.T("Download fehlgeschlagen"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
