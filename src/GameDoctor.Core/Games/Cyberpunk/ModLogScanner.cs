@@ -4,6 +4,9 @@ namespace GameDoctor.Core.Games.Cyberpunk;
 
 public sealed record LogIssue(string Source, Severity Severity, string Message, int Count, string? Mod, string File);
 
+/// <summary>Zwei oder mehr Mods ersetzen dieselbe Spielfunktion (@replaceMethod). Mod = die zuletzt geladene, Others = die überschriebenen.</summary>
+public sealed record RedscriptConflict(string Mod, string ClassName, string? Method, IReadOnlyList<string> Others);
+
 /// <summary>Inhalte einer Mod (Orte, Kartenmarkierungen, Journal-Einträge), die das Spiel nicht findet.</summary>
 public sealed record UnresolvedModContent(string Source, string Owner, IReadOnlyList<string> Items, string File);
 
@@ -40,6 +43,7 @@ public sealed class ModLogScanner(CyberpunkInstall install, IReadOnlyList<string
         public List<LogIssue> Issues { get; } = [];
         public List<UnresolvedModContent> UnresolvedContent { get; } = [];
         public List<string> ScannedFiles { get; } = [];
+        public List<RedscriptConflict> RedscriptConflicts { get; } = [];
         public string? Red4ExtVersion { get; set; }
         public string? Red4ExtGameVersion { get; set; }
         public string? CetVersion { get; set; }
@@ -109,6 +113,8 @@ public sealed class ModLogScanner(CyberpunkInstall install, IReadOnlyList<string
             else if (entries.Count > 0 && !string.IsNullOrWhiteSpace(line)) entries[^1].Lines.Add(line.Trim());
         }
 
+        ResolveReplaceConflicts(r, entries);
+
         var grouped = new Dictionary<(Severity, string, string?), int>();
         foreach (var (level, lines) in entries.Where(e => e.Level != "INFO"))
         {
@@ -123,6 +129,93 @@ public sealed class ModLogScanner(CyberpunkInstall install, IReadOnlyList<string
         }
         foreach (var ((sev, msg, mod), count) in grouped)
             r.Issues.Add(new LogIssue("redscript", sev, msg, count, mod, file));
+    }
+
+    // Beispiel eines Log-Eintrags:
+    //   At …\r6\scripts\modA\File.reds:2370:1:
+    //   @replaceMethod(VehicleComponent)
+    //   ^^^
+    //   this method replacement overwrites a previous annotation targeting the same method …
+    private static readonly Regex ConflictAt = new(@"^At\s+(?<file>.+?):(?<line>\d+):\d+:?\s*$", RegexOptions.Compiled);
+    private static readonly Regex ReplaceAnnotation = new(@"@replaceMethod\(\s*(?<cls>[^)\s]+)\s*\)", RegexOptions.Compiled);
+    private static readonly Regex FuncName = new(@"\bfunc\s+(?<name>\w+)", RegexOptions.Compiled);
+
+    /// <summary>Findet zu jedem „method replacement“-Konflikt die Mod(s), die dieselbe Funktion ebenfalls ersetzen.</summary>
+    private void ResolveReplaceConflicts(Result r, List<(string Level, List<string> Lines)> entries)
+    {
+        var found = new List<(string File, string Cls, string? Method)>();
+        foreach (var (_, lines) in entries)
+        {
+            if (!lines.Any(l => l.Contains("method replacement overwrites", StringComparison.OrdinalIgnoreCase))) continue;
+            var at = ConflictAt.Match(lines[0]);
+            var ann = lines.Select(l => ReplaceAnnotation.Match(l)).FirstOrDefault(m => m.Success);
+            if (!at.Success || ann is null) continue;
+
+            string? method = null;
+            try
+            {
+                if (int.TryParse(at.Groups["line"].Value, out var ln) && File.Exists(at.Groups["file"].Value))
+                    method = File.ReadLines(at.Groups["file"].Value).Skip(ln).Take(4)
+                        .Select(l => FuncName.Match(l)).FirstOrDefault(m => m.Success)?.Groups["name"].Value;
+            }
+            catch { /* Datei nicht lesbar */ }
+            found.Add((at.Groups["file"].Value, ann.Groups["cls"].Value, method));
+        }
+        if (found.Count == 0) return;
+
+        // Alle @replaceMethod-Stellen aller Script-Mods einmal einlesen
+        var all = new List<(string File, string Cls, string? Method)>();
+        foreach (var dir in InAllRoots("r6", "scripts").Where(Directory.Exists))
+        {
+            IEnumerable<string> files;
+            try { files = Directory.EnumerateFiles(dir, "*.reds", SearchOption.AllDirectories).ToList(); }
+            catch { continue; }
+            foreach (var f in files)
+            {
+                try
+                {
+                    var text = File.ReadAllLines(f);
+                    for (int i = 0; i < text.Length; i++)
+                    {
+                        var m = ReplaceAnnotation.Match(text[i]);
+                        if (!m.Success) continue;
+                        var fn = text.Skip(i + 1).Take(4).Select(l => FuncName.Match(l)).FirstOrDefault(x => x.Success)?.Groups["name"].Value;
+                        all.Add((f, m.Groups["cls"].Value, fn));
+                    }
+                }
+                catch { /* Datei nicht lesbar */ }
+            }
+        }
+
+        foreach (var g in found.GroupBy(x => (x.File.ToLowerInvariant(), x.Cls, x.Method)))
+        {
+            var (file, cls, method) = g.Key;
+            var self = ModNameOf(g.First().File);
+            var others = all
+                .Where(a => a.Cls == cls && a.Method == method && !string.Equals(a.File, g.First().File, StringComparison.OrdinalIgnoreCase))
+                .Select(a => ModNameOf(a.File)).Where(n => !string.Equals(n, self, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
+            r.RedscriptConflicts.Add(new RedscriptConflict(self, cls, method, others));
+        }
+    }
+
+    /// <summary>Mod-Name zu einer .reds-Datei: Ordner unter r6\scripts (oder die Datei selbst, wenn sie direkt dort liegt).</summary>
+    private string ModNameOf(string reds)
+    {
+        var m = Regex.Match(reds, @"r6[\\/]scripts[\\/](?<rest>.+)$", RegexOptions.IgnoreCase);
+        if (!m.Success) return Path.GetFileNameWithoutExtension(reds);
+        var parts = m.Groups["rest"].Value.Split('\\', '/');
+        var name = parts.Length > 1 ? parts[0] : Path.GetFileNameWithoutExtension(parts[0]);
+        // Mod Organizer 2: der Mod-Ordner liegt eine Ebene über r6\scripts
+        foreach (var root in extraRoots ?? [])
+        {
+            if (reds.StartsWith(root, StringComparison.OrdinalIgnoreCase) && !reds.StartsWith(install.Root, StringComparison.OrdinalIgnoreCase))
+            {
+                var rel = reds[root.Length..].TrimStart('\\', '/').Split('\\', '/');
+                if (rel.Length > 0 && rel[0].Length > 0 && !rel[0].Equals("r6", StringComparison.OrdinalIgnoreCase)) return rel[0];
+            }
+        }
+        return name;
     }
 
     // ---------- RED4ext ----------

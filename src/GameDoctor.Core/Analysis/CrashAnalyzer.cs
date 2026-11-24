@@ -603,7 +603,11 @@ public static class CrashAnalyzer
                 result.EnvironmentFindings.Add(new Finding(Severity.Warning, L.F("{0} redscript-Konflikte", conflicts.Sum(c => c.Count)),
                     L.T("Mehrere Mods ersetzen dieselbe Spielfunktion – nur eine davon wirkt. Das führt zu Fehlverhalten und kann Abstürze begünstigen."),
                     L.T("Bei Konflikten prüfen, ob die Mods als kompatibel gelten; ggf. eine davon entfernen."),
-                    conflicts.GroupBy(c => c.Mod ?? "?").Select(g => L.F("{0}: {1} Konflikt(e)", g.Key, g.Sum(x => x.Count))).ToList()) { Category = "Mods" });
+                    logs.RedscriptConflicts.Count > 0
+                        ? logs.RedscriptConflicts.Select(c => c.Others.Count > 0
+                            ? L.F("{0} ↔ {1}: beide ersetzen {2}", c.Mod, string.Join(", ", c.Others), c.Method is null ? c.ClassName : $"{c.ClassName}.{c.Method}")
+                            : L.F("{0}: ersetzt {1}, die auch eine andere Mod ersetzt (nicht eindeutig gefunden)", c.Mod, c.Method is null ? c.ClassName : $"{c.ClassName}.{c.Method}")).ToList()
+                        : conflicts.GroupBy(c => c.Mod ?? "?").Select(g => L.F("{0}: {1} Konflikt(e)", g.Key, g.Sum(x => x.Count))).ToList()) { Category = "Mods" });
 
             // Mod-Inhalte, die das Spiel nicht findet (z. B. Garagen ohne geladene Welt-Sektoren)
             foreach (var u in logs.UnresolvedContent.Where(u => u.Items.Count >= 2).OrderByDescending(u => u.Items.Count))
