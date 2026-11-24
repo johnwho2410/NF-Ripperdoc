@@ -218,7 +218,7 @@ public partial class MainWindow : Window
         {
             case NextStepAction.TryFix when vm.Step.Crash is { } crash:
             {
-                var dlg = new FixAttemptWindow(crash, result, _inventory, result.Classifier) { Owner = this };
+                var dlg = new FixAttemptWindow(crash, result, _inventory, result.Classifier, vm.Step.FocusMods) { Owner = this };
                 if (dlg.ShowDialog() != true || dlg.Created is null) return;
                 FixAttemptStore.Upsert(dlg.Created);
                 await RefreshFixesAsync(result);

@@ -5,7 +5,11 @@ namespace GameDoctor.Core.Games.Cyberpunk;
 public sealed record LogIssue(string Source, Severity Severity, string Message, int Count, string? Mod, string File);
 
 /// <summary>Zwei oder mehr Mods ersetzen dieselbe Spielfunktion (@replaceMethod). Mod = die zuletzt geladene, Others = die überschriebenen.</summary>
-public sealed record RedscriptConflict(string Mod, string ClassName, string? Method, IReadOnlyList<string> Others);
+public sealed record RedscriptConflict(string Mod, string ClassName, string? Method, IReadOnlyList<string> Others)
+{
+    /// <summary>Je Mod (auch die überschriebenen) eine .reds-Datei, an der sich die Mod im Mod-Manager zuordnen lässt.</summary>
+    public IReadOnlyDictionary<string, string> ScriptFiles { get; init; } = new Dictionary<string, string>();
+}
 
 /// <summary>Inhalte einer Mod (Orte, Kartenmarkierungen, Journal-Einträge), die das Spiel nicht findet.</summary>
 public sealed record UnresolvedModContent(string Source, string Owner, IReadOnlyList<string> Items, string File);
@@ -191,11 +195,14 @@ public sealed class ModLogScanner(CyberpunkInstall install, IReadOnlyList<string
         {
             var (file, cls, method) = g.Key;
             var self = ModNameOf(g.First().File);
-            var others = all
+            var otherHits = all
                 .Where(a => a.Cls == cls && a.Method == method && !string.Equals(a.File, g.First().File, StringComparison.OrdinalIgnoreCase))
-                .Select(a => ModNameOf(a.File)).Where(n => !string.Equals(n, self, StringComparison.OrdinalIgnoreCase))
-                .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
-            r.RedscriptConflicts.Add(new RedscriptConflict(self, cls, method, others));
+                .Select(a => (Name: ModNameOf(a.File), a.File)).Where(x => !string.Equals(x.Name, self, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var others = otherHits.Select(x => x.Name).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
+            var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [self] = g.First().File };
+            foreach (var x in otherHits) files.TryAdd(x.Name, x.File);
+            r.RedscriptConflicts.Add(new RedscriptConflict(self, cls, method, others) { ScriptFiles = files });
         }
     }
 

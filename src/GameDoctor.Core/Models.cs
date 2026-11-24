@@ -26,6 +26,8 @@ public sealed record Finding(
     public bool ExpertOnly { get; init; }
     /// <summary>Absturzstelle, auf die sich der Befund bezieht (damit „Lösung ausprobieren“ den richtigen Absturz öffnen kann).</summary>
     public string? Signature { get; init; }
+    /// <summary>Mods, um die es in diesem Befund geht (z. B. die Beteiligten eines Konflikts) – „Lösung ausprobieren“ schlägt sie zuerst vor.</summary>
+    public IReadOnlyList<string>? FocusMods { get; init; }
 }
 
 /// <summary>Wohin ein geladenes Modul (DLL) gehört.</summary>

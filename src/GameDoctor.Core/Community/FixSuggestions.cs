@@ -12,9 +12,30 @@ public sealed record FixSuggestion(string Label, string Reason, FixAction Action
 public static class FixSuggestions
 {
     /// <summary>Vorschläge für einen Absturz – stärkste Indizien zuerst.</summary>
-    public static List<FixSuggestion> For(CrashCase crash, AnalysisResult r, ModInventory inventory, ModuleClassifier classifier)
+    /// <param name="focusConflicts">true = der Spieler kommt von einem Mod-Konflikt: diese Mods werden zuerst vorgeschlagen.</param>
+    public static List<FixSuggestion> For(CrashCase crash, AnalysisResult r, ModInventory inventory, ModuleClassifier classifier, bool focusConflicts = false)
     {
         var list = new List<FixSuggestion>();
+
+        // 0) Mods, die dieselbe Spielfunktion ersetzen (redscript-Konflikt): nur eine davon kann wirken
+        var conflictList = new List<FixSuggestion>();
+        foreach (var c in r.ModLogs?.RedscriptConflicts ?? [])
+        {
+            if (c.Others.Count == 0) continue;
+            // Anzeigenamen aus dem Mod-Manager, sonst der Script-Ordner
+            string Display(string name, string file) => inventory.ForFile(Path.GetFileName(file))?.DisplayName ?? name;
+            foreach (var (name, file) in c.ScriptFiles)
+            {
+                var mod = inventory.ForFile(Path.GetFileName(file));
+                var label = mod?.DisplayName ?? name;
+                var others = string.Join(", ", c.ScriptFiles.Where(k => !k.Key.Equals(name, StringComparison.OrdinalIgnoreCase)).Select(k => $"„{Display(k.Key, k.Value)}“"));
+                var files = mod is not null ? inventory.FilesOf(mod.NexusId) : [Path.GetFileName(file)];
+                conflictList.Add(new FixSuggestion(L.F("„{0}“ deaktivieren", label),
+                    L.F("Ersetzt dieselbe Spielfunktion wie {0} – nur eine der Mods kann wirken. Teste, ob es besser läuft, wenn nur eine davon aktiv ist.", others),
+                    FixAction.DisableMod, label, mod?.NexusId, files.Count > 0 ? files : [Path.GetFileName(file)]));
+            }
+        }
+        if (focusConflicts) list.AddRange(conflictList);
 
         // 1) Mods im Aufrufpfad dieses Absturzes
         if (crash.Dump is { Error: null } d)
@@ -49,6 +70,8 @@ public static class FixSuggestions
                     L.F("{0} Inhalte dieser Mod („{1}“) werden vom Spiel nicht gefunden.", u.Items.Count, u.Owner),
                     FixAction.DisableMod, mod.DisplayName, mod.NexusId, inventory.FilesOf(mod.NexusId)));
         }
+
+        if (!focusConflicts) list.AddRange(conflictList);
 
         return list.GroupBy(s => (s.NexusModId, s.TargetLabel)).Select(g => g.First()).ToList();
     }

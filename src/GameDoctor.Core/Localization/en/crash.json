@@ -176,5 +176,10 @@
   "Der Absturz passierte beim Laden von Mod-Inhalten": "The crash happened while loading mod content",
   "ArchiveXL lädt Inhalte anderer Mods. Meist liegt der Fehler nicht an ArchiveXL, sondern an einer Mod, die es nutzt – zum Beispiel an veralteten Kleidungs- oder Fahrzeug-Mods. ArchiveXL selbst musst du in der Regel nicht entfernen.": "ArchiveXL loads content of other mods. The fault is usually not in ArchiveXL but in a mod that uses it – for example outdated clothing or vehicle mods. You normally do not need to remove ArchiveXL itself.",
   "{0} ↔ {1}: beide ersetzen {2}": "{0} ↔ {1}: both replace {2}",
-  "{0}: ersetzt {1}, die auch eine andere Mod ersetzt (nicht eindeutig gefunden)": "{0}: replaces {1}, which another mod also replaces (not clearly identified)"
+  "{0}: ersetzt {1}, die auch eine andere Mod ersetzt (nicht eindeutig gefunden)": "{0}: replaces {1}, which another mod also replaces (not clearly identified)",
+  "{0} zuerst aktualisieren bzw. testweise deaktivieren.": "Update {0} first, or disable it for a test.",
+  "Die beteiligten Mods sind nicht mehr installiert – hier ist nichts zu tun.": "The mods involved are no longer installed – nothing to do here.",
+  "Prüfen, ob {0} zusammen funktionieren (Mod-Seiten, Kommentare); ggf. eine davon entfernen.": "Check whether {0} work together (mod pages, comments); remove one of them if needed.",
+  "Ersetzt dieselbe Spielfunktion wie {0} – nur eine der Mods kann wirken. Teste, ob es besser läuft, wenn nur eine davon aktiv ist.": "Replaces the same game function as {0} – only one of the mods can take effect. Test whether things improve with only one of them active.",
+  "Es geht um einen Mod-Konflikt zwischen {0}. Schalte testweise eine der Mods aus und spiele weiter.": "This is about a mod conflict between {0}. Switch off one of the mods as a test and keep playing."
 }

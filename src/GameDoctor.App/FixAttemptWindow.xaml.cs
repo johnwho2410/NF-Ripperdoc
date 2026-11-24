@@ -21,7 +21,8 @@ public partial class FixAttemptWindow : Window
 
     public FixAttempt? Created { get; private set; }
 
-    public FixAttemptWindow(CrashCase crash, AnalysisResult result, ModInventory inventory, ModuleClassifier classifier)
+    /// <param name="focusMods">Mods, um die es dem Spieler gerade geht (z. B. Konflikt-Mods): werden zuerst vorgeschlagen.</param>
+    public FixAttemptWindow(CrashCase crash, AnalysisResult result, ModInventory inventory, ModuleClassifier classifier, IReadOnlyList<string>? focusMods = null)
     {
         InitializeComponent();
         _crash = crash;
@@ -32,7 +33,12 @@ public partial class FixAttemptWindow : Window
         int same = result.Crashes.Count(c => c.Signature == crash.Signature);
         TargetText.Text = L.F("Absturzstelle {0} · {1}× im gewählten Zeitraum · zuletzt am {2:g}", crash.Signature, same, crash.Report.Time);
 
-        foreach (var s in FixSuggestions.For(crash, result, inventory, classifier))
+        bool focus = focusMods is { Count: > 0 };
+        if (focus)
+            TargetText.Text += "\n" + L.F("Es geht um einen Mod-Konflikt zwischen {0}. Schalte testweise eine der Mods aus und spiele weiter.",
+                string.Join(" und ", focusMods!.Take(4).Select(m => $"„{m}“")));
+
+        foreach (var s in FixSuggestions.For(crash, result, inventory, classifier, focus))
         {
             var rb = new RadioButton
             {

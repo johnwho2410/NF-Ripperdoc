@@ -16,7 +16,7 @@ public enum NextStepAction
 }
 
 /// <summary>Ein konkreter nächster Schritt in einfacher Sprache.</summary>
-public sealed record NextStep(string Headline, string Reason, NextStepAction Action, string? ButtonText = null, CrashCase? Crash = null);
+public sealed record NextStep(string Headline, string Reason, NextStepAction Action, string? ButtonText = null, CrashCase? Crash = null, IReadOnlyList<string>? FocusMods = null);
 
 /// <summary>
 /// Sucht aus allen Befunden die wenigen Schritte heraus, die der Spieler jetzt tun kann – wichtigster zuerst.
@@ -72,7 +72,7 @@ public static class NextStepAdvisor
             bool canTry = crash is not null && f.Category is "Ursache" or "Speicher" or "Hardware" or "Mods" or "System";
             steps.Add(new NextStep(f.Recommendation!, f.PlainTitle ?? f.Title,
                 canTry && crash is not null ? NextStepAction.TryFix : NextStepAction.None,
-                canTry && crash is not null ? L.T("Lösung ausprobieren …") : null, crash));
+                canTry && crash is not null ? L.T("Lösung ausprobieren …") : null, crash, f.FocusMods));
         }
 
         // 4) Keine klare Spur, aber oft abgestürzt: Mods schrittweise eingrenzen

@@ -251,10 +251,15 @@ public static class CrashAnalyzer
             };
             if (mods.Count > 0)
             {
-                c.Findings.Add(new Finding(Severity.Warning,
+                // Die Empfehlung nennt die Mods selbst – sie steht auch allein (z. B. unter „Dein nächster Schritt“)
+                var current = mods.Where(m => m.Installed).ToList();
+                var currentNames = string.Join(", ", current.Take(3).Select(m => $"„{m.Name}“")) + (current.Count > 3 ? " …" : "");
+                c.Findings.Add(new Finding(current.Count > 0 ? Severity.Warning : Severity.Info,
                     L.F("Absturz {0} – Mods im Aufrufpfad gefunden", where),
                     L.F("{0} Auf dem Stack des abstürzenden Threads liegen Rücksprungadressen in diesen Mods/Hooks. Das ist ein starkes Indiz, dass sie beteiligt waren (aber kein Beweis):", exceptionText),
-                    L.T("Die oben genannten Mods zuerst aktualisieren bzw. testweise deaktivieren."),
+                    current.Count > 0
+                        ? L.F("{0} zuerst aktualisieren bzw. testweise deaktivieren.", currentNames)
+                        : L.T("Die beteiligten Mods sind nicht mehr installiert – hier ist nichts zu tun."),
                     mods.Select(m => L.F("{0} ({1}, {2}× auf dem Stack)", m.Name, ModuleClassifier.KindLabel(m.Kind), m.Hits)
                         + (m.Installed ? "" : " – " + L.T("nicht mehr installiert"))).ToList())
                 {
@@ -602,12 +607,17 @@ public static class CrashAnalyzer
             if (conflicts.Count > 0)
                 result.EnvironmentFindings.Add(new Finding(Severity.Warning, L.F("{0} redscript-Konflikte", conflicts.Sum(c => c.Count)),
                     L.T("Mehrere Mods ersetzen dieselbe Spielfunktion – nur eine davon wirkt. Das führt zu Fehlverhalten und kann Abstürze begünstigen."),
-                    L.T("Bei Konflikten prüfen, ob die Mods als kompatibel gelten; ggf. eine davon entfernen."),
+                    logs.RedscriptConflicts.Any(c => c.Others.Count > 0)
+                        ? L.F("Prüfen, ob {0} zusammen funktionieren (Mod-Seiten, Kommentare); ggf. eine davon entfernen.",
+                            string.Join("; ", logs.RedscriptConflicts.Where(c => c.Others.Count > 0).Take(2)
+                                .Select(c => $"„{c.Mod}“ + " + string.Join(" + ", c.Others.Take(2).Select(o => $"„{o}“")))))
+                        : L.T("Bei Konflikten prüfen, ob die Mods als kompatibel gelten; ggf. eine davon entfernen."),
                     logs.RedscriptConflicts.Count > 0
                         ? logs.RedscriptConflicts.Select(c => c.Others.Count > 0
                             ? L.F("{0} ↔ {1}: beide ersetzen {2}", c.Mod, string.Join(", ", c.Others), c.Method is null ? c.ClassName : $"{c.ClassName}.{c.Method}")
                             : L.F("{0}: ersetzt {1}, die auch eine andere Mod ersetzt (nicht eindeutig gefunden)", c.Mod, c.Method is null ? c.ClassName : $"{c.ClassName}.{c.Method}")).ToList()
-                        : conflicts.GroupBy(c => c.Mod ?? "?").Select(g => L.F("{0}: {1} Konflikt(e)", g.Key, g.Sum(x => x.Count))).ToList()) { Category = "Mods" });
+                        : conflicts.GroupBy(c => c.Mod ?? "?").Select(g => L.F("{0}: {1} Konflikt(e)", g.Key, g.Sum(x => x.Count))).ToList())
+                { Category = "Mods", FocusMods = logs.RedscriptConflicts.SelectMany(c => c.ScriptFiles.Keys).Distinct(StringComparer.OrdinalIgnoreCase).ToList() });
 
             // Mod-Inhalte, die das Spiel nicht findet (z. B. Garagen ohne geladene Welt-Sektoren)
             foreach (var u in logs.UnresolvedContent.Where(u => u.Items.Count >= 2).OrderByDescending(u => u.Items.Count))
