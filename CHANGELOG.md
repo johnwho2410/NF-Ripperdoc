@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 beta – Clearer results
+
+- **Fix attempts:** once you mark an attempt as "helped" or "did not help", the card shows it as closed and explains what happens next, instead of staying on "Test running".
+- **ArchiveXL** in the call path is no longer treated as a suspect (many mods use it). A crash directly inside ArchiveXL is only a warning, with advice to look at the mods that use it.
+- **New time range "Today"** (since midnight) for the displayed crashes, the report and the AI prompt.
+- **Removed mods:** crash modules of mods that are no longer installed are marked "no longer installed", left out of the suspect statistics and the mod search, and the AI prompt tells the AI to ignore them and use old crashes only for cross-checking.
+
 ## 0.3.0 beta – Help for players
 
 - **"Your next step"** card on the overview: up to three concrete steps in plain language, most important first.
