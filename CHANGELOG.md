@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.3 beta – Clearer recommendations
+
+- Recommendations now **name the mods** they are about (for example "Update “ModX” first") instead of pointing at "the mods listed above".
+- **Mod conflicts:** "Try a fix" opened from a conflict suggests the conflicting mods first and explains the conflict. If all mods involved in a crash are no longer installed, the finding is only informational.
+
 ## 0.3.2 beta – Name the conflicting mods
 
 - **redscript conflicts** now name the mods involved and the game function they both replace (for example "modA ↔ modB: both replace VehicleComponent.SomeMethod"), including mods managed by Mod Organizer 2.
