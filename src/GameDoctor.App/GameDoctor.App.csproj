@@ -9,7 +9,7 @@
     <AssemblyName>GameDoctor</AssemblyName>
     <RootNamespace>GameDoctor.App</RootNamespace>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>0.3.1</Version>
+    <Version>0.3.2</Version>
     <Product>NF-RIPPERDOC (GameDoctor)</Product>
   </PropertyGroup>
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 beta – Name the conflicting mods
+
+- **redscript conflicts** now name the mods involved and the game function they both replace (for example "modA ↔ modB: both replace VehicleComponent.SomeMethod"), including mods managed by Mod Organizer 2.
+
 ## 0.3.1 beta – Clearer results
 
 - **Fix attempts:** once you mark an attempt as "helped" or "did not help", the card shows it as closed and explains what happens next, instead of staying on "Test running".
