@@ -253,5 +253,16 @@
   "letzte 7 Tage": "last 7 days",
   "häufigste Absturzstelle": "most frequent crash site",
   "verdächtigste Mod": "most suspicious mod",
-  "keine Mod auffällig": "no suspicious mod"
+  "keine Mod auffällig": "no suspicious mod",
+  "Von dir als „hat geholfen“ abgeschlossen": "Closed by you as “helped”",
+  "Prima, du musst nichts weiter tun. Lass die Änderung so. GameDoctor prüft bei jeder Analyse weiter und meldet sich, falls die Absturzstelle doch wiederkommt. Die Karte kannst du mit „Entfernen“ aufräumen.": "Great, there is nothing more to do. Keep the change as it is. GameDoctor keeps checking with every analysis and will tell you if the crash site comes back. You can tidy up this card with “Remove”.",
+  "Von dir als „hat nicht geholfen“ abgeschlossen": "Closed by you as “did not help”",
+  "Dann war das wohl nicht die Ursache. Mache die Änderung rückgängig, falls du sie nicht brauchst. Für den nächsten Versuch hilft dir „Welche Mod ist es?“ (Mod-Suche) weiter. Die Karte kannst du mit „Entfernen“ aufräumen.": "Then this was probably not the cause. Undo the change if you do not need it. “Which mod is it?” (mod search) helps with the next attempt. You can tidy up this card with “Remove”.",
+  "Heute": "Today",
+  "Heute: keine Abstürze": "Today: no crashes",
+  "Heute: {0} Abstürze": "Today: {0} crashes",
+  "Abstürze (heute)": "Crashes (today)",
+  "nicht mehr installiert": "no longer installed",
+  " (nicht mehr installiert)": " (no longer installed)",
+  "5. Maßgeblich ist die AKTUELLE Mod-Liste weiter unten. Mods, die dort nicht (mehr) vorkommen oder als „nicht mehr installiert“ markiert sind, wurden inzwischen entfernt: Verdächtige sie nicht und empfiehl nicht, sie zu testen. Ältere Abstürze mit solchen Mods dienen nur dazu, gegenzuprüfen, ob die aktuellen Abstürze schon früher ähnlich auftraten.": "5. The CURRENT mod list further below is what counts. Mods that do not appear there, or are marked “no longer installed”, have since been removed: do not suspect them and do not recommend testing them. Older crashes involving such mods only serve to cross-check whether the current crashes happened in a similar way before."
 }

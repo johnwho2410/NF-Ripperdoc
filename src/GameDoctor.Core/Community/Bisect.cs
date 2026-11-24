@@ -73,7 +73,7 @@ public static class BisectPlanner
     public static Dictionary<string, int> SuspectCounts(IReadOnlyList<CrashCase> crashes, ModInventory inventory)
     {
         var suspects = crashes
-            .SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay).Select(s => s.Name).Distinct())
+            .SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay && s.Installed).Select(s => s.Name).Distinct())
             .GroupBy(n => n).Select(g => (Key: Norm(g.Key), N: g.Count())).ToList();
         var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var m in inventory.Mods)

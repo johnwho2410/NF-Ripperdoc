@@ -81,7 +81,7 @@ public static class MarkdownReport
             {
                 sb.AppendLine($"<details><summary>{L.T("Nicht-Vanilla-Module auf dem Stack")}</summary>");
                 sb.AppendLine();
-                foreach (var s in c.SuspectModules) sb.AppendLine($"- {s.Name} – {ModuleClassifier.KindLabel(s.Kind)} ({s.Hits}×)");
+                foreach (var s in c.SuspectModules) sb.AppendLine($"- {s.Name} – {ModuleClassifier.KindLabel(s.Kind)} ({s.Hits}×)" + (s.Installed ? "" : " – " + L.T("nicht mehr installiert")));
                 sb.AppendLine();
                 sb.AppendLine("</details>");
                 sb.AppendLine();

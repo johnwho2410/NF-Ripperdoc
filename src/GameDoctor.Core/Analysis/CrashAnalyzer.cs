@@ -14,7 +14,8 @@ public sealed class CrashCase
     public ModuleKind FaultKind { get; set; }
     public string Signature { get; set; } = "?";
     public string FaultLabel { get; set; } = "?";
-    public List<(string Name, ModuleKind Kind, int Hits)> SuspectModules { get; } = [];
+    /// <summary>Installed = false: die Mod-Datei liegt nicht mehr im Spiel (alte, inzwischen entfernte Mod).</summary>
+    public List<(string Name, ModuleKind Kind, int Hits, bool Installed)> SuspectModules { get; } = [];
     public List<SystemEvent> NearbyEvents { get; } = [];
     /// <summary>Funktionsnamen der Absturzstelle und des Aufrufpfads – nur wenn die Namen geladen sind und zur Spielversion passen.</summary>
     public Symbols.CrashSymbols? Symbols { get; set; }
@@ -71,10 +72,13 @@ public static class CrashAnalyzer
             Classifier = classifier,
             LocateProbes = probes,
         };
-        var since = DateTime.Now.AddDays(-options.Days);
+        // Days = 0: nur der heutige Tag (ab Mitternacht)
+        var since = options.Days <= 0 ? DateTime.Today : DateTime.Now.AddDays(-options.Days);
+        // Welche Mod-Dateien sind gerade wirklich im Spiel? Damit lassen sich Module alter, entfernter Mods kennzeichnen
+        var installedFiles = install is null ? null : Community.FixEvaluator.IndexModFiles(install, inventory.ExtraRoots);
 
         progress?.Invoke(L.T("Lese Windows-Ereignisanzeige …"));
-        result.SystemEvents = WindowsEventScanner.Scan("Cyberpunk2077.exe", TimeSpan.FromDays(options.Days));
+        result.SystemEvents = WindowsEventScanner.Scan("Cyberpunk2077.exe", DateTime.Now - since);
 
         // Optionale Funktionsnamen (Community-Daten): benennen Absturzstellen und ordnen sie Teilsystemen zu
         var symbols = Symbols.SymbolDatabase.Open(install?.Root, out var symbolStatus);
@@ -91,7 +95,7 @@ public static class CrashAnalyzer
             var dump = report.DumpPath is not null ? MinidumpReader.Analyze(report.DumpPath) : null;
             var c = new CrashCase { Report = report, Dump = dump };
             if (haveSymbols && dump is not null) c.Symbols = Symbols.SymbolDatabase.Describe(dump, symbols!);
-            ApplyCrashRules(c, classifier, result.SystemEvents);
+            ApplyCrashRules(c, classifier, result.SystemEvents, installedFiles);
             result.Crashes.Add(c);
         }
 
@@ -111,7 +115,9 @@ public static class CrashAnalyzer
     // ------------------------------------------------------------------
     // Regeln für einen einzelnen Absturz
     // ------------------------------------------------------------------
-    private static void ApplyCrashRules(CrashCase c, ModuleClassifier classifier, List<SystemEvent> events)
+    private static bool IsArchiveXl(string name) => name.Contains("archivexl", StringComparison.OrdinalIgnoreCase);
+
+    private static void ApplyCrashRules(CrashCase c, ModuleClassifier classifier, List<SystemEvent> events, HashSet<string>? installedFiles)
     {
         var r = c.Report;
         var d = c.Dump;
@@ -141,14 +147,30 @@ public static class CrashAnalyzer
                          .GroupBy(x => classifier.ResolvePath(x.Hit.Module), StringComparer.OrdinalIgnoreCase))
             {
                 var first = g.First();
-                c.SuspectModules.Add((classifier.FriendlyName(first.Hit.Module), first.Kind, g.Count()));
+                // Nur Mod-DLLs können „nicht mehr installiert“ sein (Treiber, Overlays usw. liegen außerhalb des Spielordners)
+                bool installed = installedFiles is null || first.Kind is not (ModuleKind.Mod or ModuleKind.ModFramework)
+                    || installedFiles.Contains(first.Hit.Module.Name);
+                c.SuspectModules.Add((classifier.FriendlyName(first.Hit.Module), first.Kind, g.Count(), installed));
             }
         }
 
         var exceptionText = DescribeException(d, r);
 
         // R1: Absturz direkt in einer Mod oder einem Framework
-        if (c.FaultKind is ModuleKind.Mod or ModuleKind.ModFramework)
+        if (c.FaultKind is ModuleKind.Mod or ModuleKind.ModFramework && IsArchiveXl(c.FaultLabel ?? ""))
+        {
+            // ArchiveXL lädt die Inhalte anderer Mods – ein Absturz dort liegt meist an deren Dateien, nicht an ArchiveXL selbst
+            c.Findings.Add(new Finding(Severity.Warning,
+                L.T("Absturz in ArchiveXL – vermutlich wegen einer Mod, die ArchiveXL nutzt"),
+                L.F("Der abstürzende Code liegt in {0}. {1} ArchiveXL lädt die Inhalte anderer Mods; ein Absturz dort wird meist durch fehlerhafte oder veraltete Mod-Dateien ausgelöst und selten durch ArchiveXL selbst.", classifier.ResolvePath(d!.FaultingModule!), exceptionText),
+                L.T("ArchiveXL auf die neueste Version bringen und kürzlich installierte oder aktualisierte Mods mit eigenen Inhalten (Kleidung, Fahrzeuge, Frisuren …) testweise deaktivieren. Die ArchiveXL-Logdatei nennt oft die betroffene Mod."))
+            {
+                Category = "Ursache",
+                PlainTitle = L.T("Der Absturz passierte beim Laden von Mod-Inhalten"),
+                Plain = L.T("ArchiveXL lädt Inhalte anderer Mods. Meist liegt der Fehler nicht an ArchiveXL, sondern an einer Mod, die es nutzt – zum Beispiel an veralteten Kleidungs- oder Fahrzeug-Mods. ArchiveXL selbst musst du in der Regel nicht entfernen."),
+            });
+        }
+        else if (c.FaultKind is ModuleKind.Mod or ModuleKind.ModFramework)
         {
             c.Findings.Add(new Finding(Severity.Critical,
                 L.F("Absturz direkt in der Mod „{0}“", c.FaultLabel),
@@ -217,7 +239,9 @@ public static class CrashAnalyzer
         // R4: Engine/Windows – Indizien vom Stack
         else if (d is not null && d.Error is null)
         {
-            var mods = c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.ModFramework or ModuleKind.Overlay).ToList();
+            // ArchiveXL steckt im Aufrufpfad fast jeder Mod, die Inhalte nachlädt – das ist kein Indiz und wird nicht aufgeführt
+            var mods = c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.ModFramework or ModuleKind.Overlay)
+                .Where(s => !IsArchiveXl(s.Name)).ToList();
             var where = c.FaultKind switch
             {
                 ModuleKind.GameExecutable => L.T("in der Spiel-Engine (Cyberpunk2077.exe)"),
@@ -231,7 +255,8 @@ public static class CrashAnalyzer
                     L.F("Absturz {0} – Mods im Aufrufpfad gefunden", where),
                     L.F("{0} Auf dem Stack des abstürzenden Threads liegen Rücksprungadressen in diesen Mods/Hooks. Das ist ein starkes Indiz, dass sie beteiligt waren (aber kein Beweis):", exceptionText),
                     L.T("Die oben genannten Mods zuerst aktualisieren bzw. testweise deaktivieren."),
-                    mods.Select(m => L.F("{0} ({1}, {2}× auf dem Stack)", m.Name, ModuleClassifier.KindLabel(m.Kind), m.Hits)).ToList())
+                    mods.Select(m => L.F("{0} ({1}, {2}× auf dem Stack)", m.Name, ModuleClassifier.KindLabel(m.Kind), m.Hits)
+                        + (m.Installed ? "" : " – " + L.T("nicht mehr installiert"))).ToList())
                 {
                     Category = "Ursache",
                     PlainTitle = L.T("Beim Absturz waren Mods beteiligt"),
@@ -438,7 +463,7 @@ public static class CrashAnalyzer
         foreach (var g in crashes.Where(c => c.Signature != "?" && c.FaultKind is ModuleKind.GameExecutable or ModuleKind.GameRuntime or ModuleKind.System)
                      .GroupBy(c => c.Signature).Where(g => g.Count() >= 3))
         {
-            var coupled = g.SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay).Select(s => s.Name).Distinct())
+            var coupled = g.SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay && s.Installed).Select(s => s.Name).Distinct())
                 .GroupBy(n => n).Select(x => (Name: x.Key, Count: x.Count()))
                 .Where(x => x.Count >= 3 && x.Count >= 0.8 * g.Count())
                 .OrderByDescending(x => x.Count).FirstOrDefault();
@@ -468,7 +493,7 @@ public static class CrashAnalyzer
 
         // Welche Mods tauchen über viele Abstürze hinweg auf dem Stack auf?
         var modFreq = crashes
-            .SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay).Select(s => s.Name).Distinct())
+            .SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay && s.Installed).Select(s => s.Name).Distinct())
             .GroupBy(n => n).Select(g => (Name: g.Key, Count: g.Count()))
             .Where(x => x.Count >= 2).OrderByDescending(x => x.Count).Take(8).ToList();
         if (modFreq.Count > 0)

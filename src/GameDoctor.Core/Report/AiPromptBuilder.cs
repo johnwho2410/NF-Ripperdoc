@@ -41,6 +41,7 @@ public static class AiPromptBuilder
         sb.AppendLine(L.T("2. Trenne klar zwischen dem, was die Daten belegen, und dem, was Vermutung ist."));
         sb.AppendLine(L.T("3. Gib mir konkrete, nummerierte Schritte zum Eingrenzen und Beheben (welche Mod zuerst deaktivieren, was aktualisieren, welche Einstellung ändern)."));
         sb.AppendLine(L.T("4. Sag mir, welche Informationen dir noch fehlen, um sicherer zu sein."));
+        sb.AppendLine(L.T("5. Maßgeblich ist die AKTUELLE Mod-Liste weiter unten. Mods, die dort nicht (mehr) vorkommen oder als „nicht mehr installiert“ markiert sind, wurden inzwischen entfernt: Verdächtige sie nicht und empfiehl nicht, sie zu testen. Ältere Abstürze mit solchen Mods dienen nur dazu, gegenzuprüfen, ob die aktuellen Abstürze schon früher ähnlich auftraten."));
         sb.AppendLine(L.T("Hinweise zu den Daten: CD Projekt veröffentlicht keine Debug-Symbole, Adressen in Cyberpunk2077.exe sind daher nur als Modul+Offset bekannt. „Mods auf dem Stack“ sind Rücksprungadressen im Stack des abstürzenden Threads (Heuristik: starkes Indiz, kein Beweis). Antworte auf Deutsch."));
         sb.AppendLine();
 
@@ -89,7 +90,7 @@ public static class AiPromptBuilder
             foreach (var c in others)
             {
                 var pos = c.Report.Position is { } p ? $"[{p.X:F0}, {p.Y:F0}, {p.Z:F0}]" : "–";
-                var mods = c.SuspectModules.Count > 0 ? string.Join(", ", c.SuspectModules.Select(s => s.Name)) : "–";
+                var mods = c.SuspectModules.Count > 0 ? string.Join(", ", c.SuspectModules.Select(s => s.Name + (s.Installed ? "" : L.T(" (nicht mehr installiert)")))) : "–";
                 sb.AppendLine(L.F("{0:g}", c.Report.Time) + $" | {c.Signature} | {ShortException(c)} | {Uptime(c)} | {pos} | {mods}");
             }
             sb.AppendLine();
@@ -159,7 +160,7 @@ public static class AiPromptBuilder
             rep.VramUsedMb?.ToString() ?? "?", rep.VramTotalMb?.ToString() ?? "?", rep.OutOfMemory ? L.T("ja") : L.T("nein"), rep.RayTracing?.ToString() ?? "?"));
         if (rep.Position is { } p) sb.AppendLine(L.F("- Position im Spiel: [{0:F0}, {1:F0}, {2:F0}]", p.X, p.Y, p.Z));
         if (c.SuspectModules.Count > 0)
-            sb.AppendLine(L.F("- Nicht-Vanilla-Module auf dem Stack: {0}", string.Join(", ", c.SuspectModules.Select(s => $"{s.Name} ({s.Hits}×)"))));
+            sb.AppendLine(L.F("- Nicht-Vanilla-Module auf dem Stack: {0}", string.Join(", ", c.SuspectModules.Select(s => $"{s.Name} ({s.Hits}×)" + (s.Installed ? "" : L.T(" (nicht mehr installiert)"))))));
         if (detailed && c.Dump is { Error: null } d)
         {
             var frames = d.StackHits.Take(25).Select(h => $"{h.Module.Name}+0x{h.Offset:X}");

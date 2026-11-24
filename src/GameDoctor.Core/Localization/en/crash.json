@@ -169,5 +169,10 @@
   "Die Auslagerungsdatei auf C: hat eine feste Größe und ist davon nicht betroffen.": "The page file on C: has a fixed size and is not affected.",
   "Die Auslagerungsdatei liegt auf {0} und ist davon nicht betroffen.": "The page file is on {0} and is not affected.",
   "Der Shader-Cache des Grafiktreibers und temporäre Dateien liegen auf C:. Ist der Platz knapp, können neue Shader nicht gespeichert werden – das führt zu Nachladerucklern, und Windows-Updates oder Absturzberichte können scheitern.": "The graphics driver's shader cache and temporary files are on C:. When space runs low, new shaders can't be saved – which causes stutter, and Windows updates or crash reports may fail.",
-  "Mindestens 15–20 GB auf C: freihalten.": "Keep at least 15–20 GB free on C:."
+  "Mindestens 15–20 GB auf C: freihalten.": "Keep at least 15–20 GB free on C:.",
+  "Absturz in ArchiveXL – vermutlich wegen einer Mod, die ArchiveXL nutzt": "Crash in ArchiveXL – probably caused by a mod that uses ArchiveXL",
+  "Der abstürzende Code liegt in {0}. {1} ArchiveXL lädt die Inhalte anderer Mods; ein Absturz dort wird meist durch fehlerhafte oder veraltete Mod-Dateien ausgelöst und selten durch ArchiveXL selbst.": "The crashing code is in {0}. {1} ArchiveXL loads the content of other mods; a crash there is usually triggered by faulty or outdated mod files and rarely by ArchiveXL itself.",
+  "ArchiveXL auf die neueste Version bringen und kürzlich installierte oder aktualisierte Mods mit eigenen Inhalten (Kleidung, Fahrzeuge, Frisuren …) testweise deaktivieren. Die ArchiveXL-Logdatei nennt oft die betroffene Mod.": "Update ArchiveXL to the latest version and try disabling recently installed or updated mods with their own content (clothing, vehicles, hairstyles …). The ArchiveXL log file often names the affected mod.",
+  "Der Absturz passierte beim Laden von Mod-Inhalten": "The crash happened while loading mod content",
+  "ArchiveXL lädt Inhalte anderer Mods. Meist liegt der Fehler nicht an ArchiveXL, sondern an einer Mod, die es nutzt – zum Beispiel an veralteten Kleidungs- oder Fahrzeug-Mods. ArchiveXL selbst musst du in der Regel nicht entfernen.": "ArchiveXL loads content of other mods. The fault is usually not in ArchiveXL but in a mod that uses it – for example outdated clothing or vehicle mods. You normally do not need to remove ArchiveXL itself."
 }

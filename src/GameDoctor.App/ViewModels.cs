@@ -51,7 +51,8 @@ public sealed class CrashViewModel
         Badge = SeverityBrushConverter.For(TopSeverity);
         Uptime = r.UptimeSeconds is int u ? TimeSpan.FromSeconds(u).ToString(@"h\:mm\:ss") : "?";
         Findings = c.Findings;
-        SuspectModules = c.SuspectModules.Select(s => L.F("{0}  ·  {1}  ·  {2}× auf dem Stack", s.Name, ModuleClassifier.KindLabel(s.Kind), s.Hits)).ToList();
+        SuspectModules = c.SuspectModules.Select(s => L.F("{0}  ·  {1}  ·  {2}× auf dem Stack", s.Name, ModuleClassifier.KindLabel(s.Kind), s.Hits)
+            + (s.Installed ? "" : "  ·  " + L.T("nicht mehr installiert"))).ToList();
 
         var rows = new List<DetailRow>
         {
@@ -251,7 +252,22 @@ public sealed class FixAttemptViewModel
         Detail = ev.Detail;
         Progress = Math.Clamp(ev.Progress, 0, 1) * 100;
         ShowProgress = ev.Status == GameDoctor.Core.Community.FixStatus.Waiting;
-        StatusBrush = ev.Status switch
+        // Hat der Nutzer den Test selbst abgeschlossen, darf die Karte nicht weiter „Test läuft“ zeigen
+        bool closedByUser = ev.Status == GameDoctor.Core.Community.FixStatus.Waiting
+            && a.Verdict != GameDoctor.Core.Community.UserVerdict.None;
+        if (closedByUser)
+        {
+            ShowProgress = false;
+            ConfirmText = null;
+            bool helped = a.Verdict == GameDoctor.Core.Community.UserVerdict.Helped;
+            Headline = helped ? L.T("Von dir als „hat geholfen“ abgeschlossen") : L.T("Von dir als „hat nicht geholfen“ abgeschlossen");
+            Detail = helped
+                ? L.T("Prima, du musst nichts weiter tun. Lass die Änderung so. GameDoctor prüft bei jeder Analyse weiter und meldet sich, falls die Absturzstelle doch wiederkommt. Die Karte kannst du mit „Entfernen“ aufräumen.")
+                : L.T("Dann war das wohl nicht die Ursache. Mache die Änderung rückgängig, falls du sie nicht brauchst. Für den nächsten Versuch hilft dir „Welche Mod ist es?“ (Mod-Suche) weiter. Die Karte kannst du mit „Entfernen“ aufräumen.");
+        }
+        StatusBrush = closedByUser
+            ? (a.Verdict == GameDoctor.Core.Community.UserVerdict.Helped ? SeverityBrushConverter.Good : SeverityBrushConverter.For(Severity.Info))
+            : ev.Status switch
         {
             GameDoctor.Core.Community.FixStatus.LikelyHelped => SeverityBrushConverter.Good,
             GameDoctor.Core.Community.FixStatus.NotHelped => SeverityBrushConverter.For(Severity.Critical),
@@ -320,9 +336,11 @@ public sealed class MainViewModel : ObservableObject
         int n = 0;
         foreach (var s in steps) NextSteps.Add(new NextStepViewModel(++n, s));
         int crashes = Result?.Crashes.Count ?? 0;
-        NextStepsSummary = crashes == 0
-            ? L.F("Letzte {0} Tage: keine Abstürze", Days)
-            : L.F("Letzte {0} Tage: {1} Abstürze", Days, crashes);
+        NextStepsSummary = Days <= 0
+            ? (crashes == 0 ? L.T("Heute: keine Abstürze") : L.F("Heute: {0} Abstürze", crashes))
+            : crashes == 0
+                ? L.F("Letzte {0} Tage: keine Abstürze", Days)
+                : L.F("Letzte {0} Tage: {1} Abstürze", Days, crashes);
     }
 
     public PerformanceViewModel Perf { get; } = new();
@@ -375,7 +393,7 @@ public sealed class MainViewModel : ObservableObject
 
         Stats.Clear();
         var crashes = r.Crashes;
-        Stats.Add(new StatTile(crashes.Count.ToString(), L.F("Abstürze ({0} Tage)", Days)));
+        Stats.Add(new StatTile(crashes.Count.ToString(), Days <= 0 ? L.T("Abstürze (heute)") : L.F("Abstürze ({0} Tage)", Days)));
         Stats.Add(new StatTile(crashes.Count(c => c.Report.Time >= DateTime.Now.AddDays(-7)).ToString(), L.T("letzte 7 Tage")));
 
         var topSig = crashes.Where(c => c.Signature != "?").GroupBy(c => c.Signature).OrderByDescending(g => g.Count()).FirstOrDefault();
@@ -384,7 +402,7 @@ public sealed class MainViewModel : ObservableObject
             : new StatTile("–", L.T("häufigste Absturzstelle")));
 
         var topMod = crashes
-            .SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay).Select(s => s.Name).Distinct())
+            .SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay && s.Installed).Select(s => s.Name).Distinct())
             .GroupBy(n => n).OrderByDescending(g => g.Count()).FirstOrDefault();
         Stats.Add(topMod is not null
             ? new StatTile($"{topMod.Count()}×", L.T("verdächtigste Mod"), topMod.Key)
@@ -398,7 +416,7 @@ public sealed class MainViewModel : ObservableObject
         }
         static string Norm(string s) => new(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
         var suspects = crashes
-            .SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay).Select(s => s.Name).Distinct())
+            .SelectMany(c => c.SuspectModules.Where(s => s.Kind is ModuleKind.Mod or ModuleKind.Overlay && s.Installed).Select(s => s.Name).Distinct())
             .GroupBy(n => n).Select(g => (Key: Norm(g.Key), N: g.Count())).ToList();
         foreach (var m in r.Inventory.Mods.OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase))
         {

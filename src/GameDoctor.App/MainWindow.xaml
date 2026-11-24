@@ -30,6 +30,7 @@
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                         <Border Background="{DynamicResource Bg}" CornerRadius="{DynamicResource CornerS}" Padding="3" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
+                                <RadioButton Style="{StaticResource Segment}" Content="{local:T 'Heute'}" Tag="0" GroupName="days" Checked="Days_Checked"/>
                                 <RadioButton Style="{StaticResource Segment}" Content="{local:T '7 Tage'}" Tag="7" GroupName="days" Checked="Days_Checked"/>
                                 <RadioButton Style="{StaticResource Segment}" Content="{local:T '30 Tage'}" Tag="30" GroupName="days" IsChecked="True" Checked="Days_Checked"/>
                                 <RadioButton Style="{StaticResource Segment}" Content="{local:T '90 Tage'}" Tag="90" GroupName="days" Checked="Days_Checked"/>
