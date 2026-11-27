@@ -293,14 +293,17 @@ public sealed class PerformanceRecorder : IDisposable
                     lastSensors.Average(x => x.CpuMaxCorePct),
                     gpuUtils.Count > 0 ? gpuUtils.Average() : null);
             }
-            var last10s = frames.Where(f => f.TimeMs >= now - 10000).Select(f => f.FrameTimeMs).ToList();
+            var window = frames.Where(f => f.TimeMs >= now - 10000).ToList();
+            var last10s = window.Select(f => f.FrameTimeMs).ToList();
             if (last10s.Count >= 20) low = 1000.0 / PerformanceAnalyzer.Percentile(last10s, 99);
-            recentFt = Downsample(last10s, 240);
-            if (last10s.Count >= 20)
+            // Kurve und Ruckler auf Basis der echten Bilder (Frame Generation), wie in der Auswertung
+            var realFt = FrameRhythm.RealFrames(window).Select(f => f.FrameTimeMs).ToList();
+            recentFt = Downsample(realFt, 240);
+            if (realFt.Count >= 20)
             {
                 // Gleiche Regel wie in der Auswertung: deutlich länger als der Median der Umgebung
-                double median = PerformanceAnalyzer.Percentile(last10s, 50);
-                stutters = last10s.Count(x => x > 2.0 * median && x > median + 12);
+                double median = PerformanceAnalyzer.Percentile(realFt, 50);
+                stutters = realFt.Count(x => x > 2.0 * median && x > median + 12);
             }
         }
         return new LiveStats(_clock.Elapsed, frames.Count, fps, ft, low, s.CpuTotalPct, s.CpuMaxCorePct,

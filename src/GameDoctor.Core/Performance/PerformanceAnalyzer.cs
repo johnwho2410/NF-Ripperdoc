@@ -177,15 +177,19 @@ public static class PerformanceAnalyzer
         }
 
         // Ruckler: deutlich länger als der gleitende Median der Umgebung
+        // (bei Frame Generation auf Basis der echten Bilder, sonst gälte jedes zweite als Ruckler)
+        var real = FrameRhythm.RealFrames(frames);
+        var realFt = real.Select(x => x.FrameTimeMs).ToList();
+        double realMedian = Percentile(realFt, 50);
         var stutters = new List<(double Sec, double Ms)>();
         const int window = 60;
-        for (int i = 0; i < ft.Count; i++)
+        for (int i = 0; i < realFt.Count; i++)
         {
-            int a = Math.Max(0, i - window), b = Math.Min(ft.Count, i + window);
-            var local = ft.GetRange(a, b - a);
+            int a = Math.Max(0, i - window), b = Math.Min(realFt.Count, i + window);
+            var local = realFt.GetRange(a, b - a);
             double localMedian = Percentile(local, 50);
-            if (ft[i] > 2.0 * localMedian && ft[i] > localMedian + 12)
-                stutters.Add((frames[i].TimeMs / 1000.0, ft[i]));
+            if (realFt[i] > 2.0 * localMedian && realFt[i] > localMedian + 12)
+                stutters.Add((real[i].TimeMs / 1000.0, realFt[i]));
         }
         double minutes = Math.Max(total / 60000.0, 1 / 60.0);
 
@@ -228,8 +232,8 @@ public static class PerformanceAnalyzer
         var warm = gameplay.WarmupFrames;
         if (warm.Count >= 30)
         {
-            var wft = warm.Select(x => x.FrameTimeMs).ToList();
-            int warmHitches = wft.Count(x => x > 2 * median && x > median + 12);
+            var wft = FrameRhythm.RealFrames(warm).Select(x => x.FrameTimeMs).ToList();
+            int warmHitches = wft.Count(x => x > 2 * realMedian && x > realMedian + 12);
             double warmSec = wft.Sum() / 1000;
             double warmLow = 1000 / Percentile(wft, 99);
             bool bad = warmHitches / Math.Max(warmSec / 60, 0.1) > 3 * Math.Max(report.StuttersPerMinute, 1);
@@ -300,6 +304,10 @@ public static class PerformanceAnalyzer
             { Category = "Flaschenhals" });
         }
 
+        // --- Stottern in festem Takt (z. B. etwa einmal pro Sekunde)
+        var rhythm = FrameRhythm.FindPeriodicHitches(real, realMedian);
+        if (rhythm.Count > 0) f.Add(RhythmFinding(rhythm));
+
         // --- Ruckler
         if (report.StuttersPerMinute >= 2)
         {
@@ -329,8 +337,10 @@ public static class PerformanceAnalyzer
             f.Add(new Finding(report.StuttersPerMinute >= 6 ? Severity.Warning : Severity.Hint,
                 L.F("{0} Ruckler ({1:F1} pro Minute)", stutters.Count, report.StuttersPerMinute),
                 L.T("Einzelne Frames dauerten deutlich länger als ihre Nachbarn – das spürt man als Ruckeln, auch bei hohen Durchschnitts-FPS. Typische Ursachen in Cyberpunk: Nachladen beim schnellen Fahren, voller VRAM, Shader-Kompilierung nach Treiber-Updates, Hintergrundprozesse."),
-                ramCause || (!vramCause && ramBase >= 0.8)
-                    ? L.T("Zuerst den Arbeitsspeicher entlasten – siehe Hinweis zum virtuellen Speicher/zur Auslagerungsdatei.")
+                rhythm.Count > 0
+                    ? L.T("Zuerst um das regelmäßige Stottern kümmern (eigener Hinweis).")
+                    : ramCause || (!vramCause && ramBase >= 0.8)
+                    ?L.T("Zuerst den Arbeitsspeicher entlasten – siehe Hinweis zum virtuellen Speicher/zur Auslagerungsdatei.")
                     : vramCause
                         ? L.T("VRAM entlasten (Texturqualität/Raytracing reduzieren).")
                         : L.T("Beim schnellen Fahren normal; bei Ruckeln im Stand Hintergrundprogramme und Mods prüfen."),
@@ -343,9 +353,10 @@ public static class PerformanceAnalyzer
                 L.T("Die Frametimes sind gleichmäßig."), null) { Category = "Ruckler" });
         }
 
-        if (p99 > 2.2 * median && report.StuttersPerMinute < 2)
+        double realP99 = Percentile(realFt, 99);
+        if (realP99 > 2.2 * realMedian && report.StuttersPerMinute < 2)
             f.Add(new Finding(Severity.Hint, L.T("Ungleichmäßige Frametimes"),
-                L.F("Die langsamsten 1 % der Frames brauchen {0:F1} ms, der Median {1:F1} ms. Das wirkt unruhiger, als die FPS vermuten lassen.", p99, median),
+                L.F("Die langsamsten 1 % der Frames brauchen {0:F1} ms, der Median {1:F1} ms. Das wirkt unruhiger, als die FPS vermuten lassen.", realP99, realMedian),
                 L.T("Ein FPS-Limit knapp unter dem erreichten Minimum (z. B. per Treiber oder RTSS) glättet die Darstellung.")) { Category = "Ruckler" });
 
         // --- Darstellung
@@ -362,6 +373,26 @@ public static class PerformanceAnalyzer
 
         AddSensorFindings(f, sensors, settings, gpuShare, rec.ProcessName);
         return report;
+    }
+
+    private static Finding RhythmFinding(List<PeriodicRun> runs)
+    {
+        int count = runs.Sum(r => r.Count);
+        double period = runs.Sum(r => r.PeriodSec * r.Count) / count;
+        double ms = runs.Sum(r => r.AvgMs * r.Count) / count;
+        bool cpu = runs.Sum(r => r.CpuBoundShare * r.Count) / count >= 0.7;
+        static string At(double sec) => TimeSpan.FromSeconds(sec).ToString(@"m\:ss");
+
+        return new Finding(Severity.Warning,
+            L.F("Regelmäßiges Stottern: etwa alle {0:F1} Sekunden", period),
+            L.F("Das Spiel blieb in festem Takt kurz stehen – {0} Mal, jeweils etwa {1:F0} ms.", count, ms) + " " +
+            (cpu
+                ? L.T("Der Prozessor war dabei beschäftigt, die Grafikkarte musste warten. Grafikeinstellungen ändern daran in der Regel nichts. So ein Takt entsteht meist durch etwas, das in festen Abständen läuft – häufig eine Mod mit Skripten, seltener ein Programm im Hintergrund.")
+                : L.T("Der Prozessor war dabei nicht durchgehend beschäftigt. So ein Takt entsteht durch etwas, das in festen Abständen läuft; welche Seite bremst, lässt sich hier nicht klar sagen.")),
+            L.T("Merke dir, wobei es anfängt (z. B. im Kampf, beim Fahren, an einem bestimmten Ort). Schalte zuerst die Mods aus, die in so einer Situation aktiv werden, und miss erneut. Findest du keine, schalte die Hälfte der Skript-Mods aus, miss, und grenze so weiter ein. Beende testweise auch Overlays und Überwachungsprogramme."),
+            runs.OrderByDescending(r => r.Count).Take(3).OrderBy(r => r.StartSec)
+                .Select(r => L.F("Von {0} bis {1}: {2} Hänger, alle {3:F1} s, je etwa {4:F0} ms", At(r.StartSec), At(r.EndSec), r.Count, r.PeriodSec, r.AvgMs)).ToList())
+        { Category = "Ruckler" };
     }
 
     private static void AddSensorFindings(List<Finding> f, List<SensorSample> sensors, CyberpunkSettings? settings, double? gpuShare, string processName)

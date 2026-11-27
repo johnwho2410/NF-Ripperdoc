@@ -95,5 +95,12 @@
   "GPU-Temperatur in Ordnung (max. {0:F0} °C)": "GPU temperature OK (max. {0:F0} °C)",
   "Keine thermische Drosselung.": "No thermal throttling.",
   "GPU läuft am Powerlimit ({0:F0} % der Zeit)": "GPU is running at its power limit ({0:F0} % of the time)",
-  "Die Karte nutzt ihr Leistungsbudget ({0:F0} W) voll aus. Unter Volllast ist das normal und kein Fehler.": "The card uses its full power budget ({0:F0} W). Under full load that's normal and not a fault."
+  "Die Karte nutzt ihr Leistungsbudget ({0:F0} W) voll aus. Unter Volllast ist das normal und kein Fehler.": "The card uses its full power budget ({0:F0} W). Under full load that's normal and not a fault.",
+  "Zuerst um das regelmäßige Stottern kümmern (eigener Hinweis).": "Deal with the rhythmic stutter first (separate note).",
+  "Regelmäßiges Stottern: etwa alle {0:F1} Sekunden": "Rhythmic stutter: about every {0:F1} seconds",
+  "Das Spiel blieb in festem Takt kurz stehen – {0} Mal, jeweils etwa {1:F0} ms.": "The game froze briefly in a steady rhythm – {0} times, about {1:F0} ms each.",
+  "Der Prozessor war dabei beschäftigt, die Grafikkarte musste warten. Grafikeinstellungen ändern daran in der Regel nichts. So ein Takt entsteht meist durch etwas, das in festen Abständen läuft – häufig eine Mod mit Skripten, seltener ein Programm im Hintergrund.": "The processor was busy while the graphics card had to wait. Graphics settings usually do not change this. A rhythm like this mostly comes from something that runs at fixed intervals – often a script mod, less often a background program.",
+  "Der Prozessor war dabei nicht durchgehend beschäftigt. So ein Takt entsteht durch etwas, das in festen Abständen läuft; welche Seite bremst, lässt sich hier nicht klar sagen.": "The processor was not busy throughout. A rhythm like this comes from something that runs at fixed intervals; which side is holding things up cannot be told clearly here.",
+  "Merke dir, wobei es anfängt (z. B. im Kampf, beim Fahren, an einem bestimmten Ort). Schalte zuerst die Mods aus, die in so einer Situation aktiv werden, und miss erneut. Findest du keine, schalte die Hälfte der Skript-Mods aus, miss, und grenze so weiter ein. Beende testweise auch Overlays und Überwachungsprogramme.": "Note when it starts (e.g. in combat, while driving, at a certain place). First switch off the mods that become active in such a situation and measure again. If you find none, switch off half of your script mods, measure, and narrow it down from there. Also close overlays and monitoring tools as a test.",
+  "Von {0} bis {1}: {2} Hänger, alle {3:F1} s, je etwa {4:F0} ms": "From {0} to {1}: {2} freezes, every {3:F1} s, about {4:F0} ms each"
 }
