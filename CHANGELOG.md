@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4 beta – Rhythmic stutter
+
+- **New in the performance analysis: "Rhythmic stutter".** If the game keeps freezing at a steady interval (for example once per second), the app now says so, shows the time ranges, explains whether the processor was busy and suggests how to narrow down the cause.
+- **Fixed: stutter count with Frame Generation.** Generated in-between frames made almost every second frame count as a stutter. This affected the analysis and the counter and graph of the in-game overlay.
+
 ## 0.3.3 beta – Clearer recommendations
 
 - Recommendations now **name the mods** they are about (for example "Update “ModX” first") instead of pointing at "the mods listed above".
