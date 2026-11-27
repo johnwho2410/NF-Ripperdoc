@@ -43,6 +43,8 @@ public sealed class PerformanceRecording
     public string? GpuName { get; set; }
     public bool PresentMonUsed { get; set; }
     public string? PresentMonError { get; set; }
+    /// <summary>Bekannte Hintergrundprogramme beim Start der Aufnahme (null = ältere Aufnahme ohne diese Angabe).</summary>
+    public List<string>? BackgroundPrograms { get; set; }
     public List<FrameSample> Frames { get; } = [];
     public List<SensorSample> Sensors { get; } = [];
 }
@@ -99,6 +101,7 @@ public sealed class PerformanceRecorder : IDisposable
 
         _gpu = NvidiaGpu.TryOpen();
         _rec.GpuName = _gpu?.Name;
+        _rec.BackgroundPrograms = BackgroundTools.Detect();
 
         StartPresentMon();
         _sensorTask = Task.Run(() => SensorLoop(_cts.Token));

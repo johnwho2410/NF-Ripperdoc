@@ -306,7 +306,7 @@ public static class PerformanceAnalyzer
 
         // --- Stottern in festem Takt (z. B. etwa einmal pro Sekunde)
         var rhythm = FrameRhythm.FindPeriodicHitches(real, realMedian);
-        if (rhythm.Count > 0) f.Add(RhythmFinding(rhythm));
+        if (rhythm.Count > 0) f.Add(RhythmFinding(rhythm, rec.BackgroundPrograms));
 
         // --- Ruckler
         if (report.StuttersPerMinute >= 2)
@@ -375,8 +375,20 @@ public static class PerformanceAnalyzer
         return report;
     }
 
-    private static Finding RhythmFinding(List<PeriodicRun> runs)
+    private static Finding RhythmFinding(List<PeriodicRun> runs, List<string>? recordedPrograms)
     {
+        // Ältere Aufnahmen haben die Liste nicht – dann zählt, was gerade läuft (und das wird so benannt)
+        var programs = recordedPrograms ?? BackgroundTools.Detect();
+        var sensorTools = programs.Where(BackgroundTools.ReadsSensors).ToList();
+        var otherTools = programs.Where(p => !BackgroundTools.ReadsSensors(p)).ToList();
+        var evidence = new List<string>();
+        if (sensorTools.Count > 0)
+            evidence.Add(L.F("Zuerst testen – lesen laufend Hardware-Werte aus: {0}", string.Join(", ", sensorTools)));
+        if (otherTools.Count > 0)
+            evidence.Add(L.F("Danach testen – weitere Hintergrundprogramme: {0}", string.Join(", ", otherTools)));
+        if (programs.Count > 0 && recordedPrograms is null)
+            evidence.Add(L.T("(Diese Programme laufen jetzt gerade – bei dieser älteren Aufnahme wurden sie nicht mitgespeichert.)"));
+
         int count = runs.Sum(r => r.Count);
         double period = runs.Sum(r => r.PeriodSec * r.Count) / count;
         double ms = runs.Sum(r => r.AvgMs * r.Count) / count;
@@ -387,11 +399,11 @@ public static class PerformanceAnalyzer
             L.F("Regelmäßiges Stottern: etwa alle {0:F1} Sekunden", period),
             L.F("Das Spiel blieb in festem Takt kurz stehen – {0} Mal, jeweils etwa {1:F0} ms.", count, ms) + " " +
             (cpu
-                ? L.T("Der Prozessor war dabei beschäftigt, die Grafikkarte musste warten. Grafikeinstellungen ändern daran in der Regel nichts. So ein Takt entsteht meist durch etwas, das in festen Abständen läuft – häufig eine Mod mit Skripten, seltener ein Programm im Hintergrund.")
+                ? L.T("Der Prozessor war dabei beschäftigt, die Grafikkarte musste warten. Grafikeinstellungen ändern daran in der Regel nichts. So ein Takt entsteht durch etwas, das in festen Abständen läuft – ein Programm im Hintergrund (zum Beispiel eines, das Hardware-Werte ausliest) oder eine Mod mit Skripten.")
                 : L.T("Der Prozessor war dabei nicht durchgehend beschäftigt. So ein Takt entsteht durch etwas, das in festen Abständen läuft; welche Seite bremst, lässt sich hier nicht klar sagen.")),
-            L.T("Merke dir, wobei es anfängt (z. B. im Kampf, beim Fahren, an einem bestimmten Ort). Schalte zuerst die Mods aus, die in so einer Situation aktiv werden, und miss erneut. Findest du keine, schalte die Hälfte der Skript-Mods aus, miss, und grenze so weiter ein. Beende testweise auch Overlays und Überwachungsprogramme."),
-            runs.OrderByDescending(r => r.Count).Take(3).OrderBy(r => r.StartSec)
-                .Select(r => L.F("Von {0} bis {1}: {2} Hänger, alle {3:F1} s, je etwa {4:F0} ms", At(r.StartSec), At(r.EndSec), r.Count, r.PeriodSec, r.AvgMs)).ToList())
+            L.T("Passiert es auch in anderen Spielen oder ohne Mods? Dann ist sehr wahrscheinlich ein Programm im Hintergrund schuld: Beende, während es stottert, nacheinander ein Programm (die unten genannten zuerst). Hört es sofort auf, hast du den Auslöser. Passiert es nur in diesem Spiel, merke dir, wobei es anfängt, und schalte die dazu passenden Mods aus – sonst jeweils die Hälfte der Skript-Mods."),
+            evidence.Concat(runs.OrderByDescending(r => r.Count).Take(3).OrderBy(r => r.StartSec)
+                .Select(r => L.F("Von {0} bis {1}: {2} Hänger, alle {3:F1} s, je etwa {4:F0} ms", At(r.StartSec), At(r.EndSec), r.Count, r.PeriodSec, r.AvgMs))).ToList())
         { Category = "Ruckler" };
     }
 
