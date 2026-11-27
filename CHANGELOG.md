@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.5 beta – Find the background program
+
+- The **"Rhythmic stutter"** note now names known background programs that are running, listing those that read hardware sensors first, and explains how to test them one by one. Script mods are shown as one of the possible causes, not the main one.
+- Performance recordings save the names of these programs (from a fixed list only, never the full process list). They are also part of the AI prompt if you include the performance data.
+
 ## 0.3.4 beta – Rhythmic stutter
 
 - **New in the performance analysis: "Rhythmic stutter".** If the game keeps freezing at a steady interval (for example once per second), the app now says so, shows the time ranges, explains whether the processor was busy and suggests how to narrow down the cause.
